@@ -4,11 +4,12 @@ package config
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 
-	"github.com/BurntSushi/toml"
+	"go.yaml.in/yaml/v3"
 )
 
 const (
@@ -20,14 +21,14 @@ const (
 type Config struct {
 	// ClientID is the client ID of a GitHub OAuth App with the device flow
 	// enabled. It is public (not a secret).
-	ClientID string `toml:"client_id"`
+	ClientID string `yaml:"client_id"`
 	// Scopes requested during login.
-	Scopes []string `toml:"scopes"`
+	Scopes []string `yaml:"scopes"`
 	// Theme is "auto" (default, follows the terminal), "light" or "dark".
-	Theme string `toml:"theme"`
+	Theme string `yaml:"theme"`
 	// Keys maps an action name to its keys, e.g. merge = ["M"].
 	// Names are validated by the TUI, which owns the action list.
-	Keys map[string][]string `toml:"keys"`
+	Keys map[string][]string `yaml:"keys"`
 }
 
 func defaults() Config {
@@ -49,7 +50,26 @@ func Path() string {
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(d, "config.toml")
+	return filepath.Join(d, "config.yaml")
+}
+
+// decodeFile fills c from a YAML file. A missing or empty file is fine;
+// unknown fields are rejected so a typo like "clientid" is not silently ignored.
+func decodeFile(path string, c *Config) error {
+	f, err := os.Open(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	dec := yaml.NewDecoder(f)
+	dec.KnownFields(true)
+	if err := dec.Decode(c); err != nil && !errors.Is(err, io.EOF) { // io.EOF: empty file
+		return err
+	}
+	return nil
 }
 
 // Load reads the config at path (a missing file is not an error), then applies
@@ -57,7 +77,7 @@ func Path() string {
 func Load(path string) (Config, error) {
 	c := defaults()
 	if path != "" {
-		if _, err := toml.DecodeFile(path, &c); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		if err := decodeFile(path, &c); err != nil {
 			return c, fmt.Errorf("lecture de %s : %w", path, err)
 		}
 	}

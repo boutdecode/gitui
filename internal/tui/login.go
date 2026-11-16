@@ -221,7 +221,7 @@ func (s *loginScreen) View() string {
 			"2. Renseignez son client ID :\n" +
 			"     - variable d'environnement  GITUI_CLIENT_ID\n"
 		if s.a.ConfigPath != "" {
-			body += fmt.Sprintf("     - ou client_id = \"…\" dans %s\n", s.a.ConfigPath)
+			body += fmt.Sprintf("     - ou client_id: … dans %s\n", s.a.ConfigPath)
 		}
 		body += "\nPuis relancez gitui."
 	case loginStarting:

@@ -22,7 +22,7 @@ func authOpts(t *testing.T, clientID, baseURL string) *AuthOptions {
 		Flow:        auth.Flow{ClientID: clientID, BaseURL: baseURL},
 		Store:       auth.Store{},
 		NewProvider: func(string) (provider.Provider, error) { return fake.New(), nil },
-		ConfigPath:  "/cfg/config.toml",
+		ConfigPath:  "/cfg/config.yaml",
 	}
 }
 
@@ -50,7 +50,7 @@ func TestLoginNeedsClientID(t *testing.T) {
 	s := newLoginScreen(authOpts(t, "", ""))
 	s2, _ := s.Update(s.checkStored()())
 	out := s2.View()
-	if !strings.Contains(out, "GITUI_CLIENT_ID") || !strings.Contains(out, "/cfg/config.toml") {
+	if !strings.Contains(out, "GITUI_CLIENT_ID") || !strings.Contains(out, "/cfg/config.yaml") {
 		t.Fatalf("missing setup help:\n%s", out)
 	}
 }

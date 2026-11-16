@@ -8,4 +8,4 @@ test:
 vet:
 	go vet ./...
 build:
-	go build -o bin/gitui ./cmd/gitui
+	go build -o gitui ./cmd/gitui

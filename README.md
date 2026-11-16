@@ -16,7 +16,7 @@ Il faut Go ≥ 1.26.
 ```sh
 go install github.com/kevin/gitui/cmd/gitui@latest   # adaptez le chemin du module
 # ou, depuis un clone :
-make build        # produit bin/gitui
+make build        # produit ./gitui à la racine
 ```
 
 ## Premier lancement
@@ -26,7 +26,7 @@ make build        # produit bin/gitui
    est public.
 2. Renseignez son client ID, au choix :
    - variable d'environnement `GITUI_CLIENT_ID`
-   - `client_id = "…"` dans le fichier de configuration (ci-dessous)
+   - `client_id: …` dans le fichier de configuration (ci-dessous)
 3. Lancez `gitui`, ouvrez l'URL affichée et saisissez le code (`c` le copie).
 
 Pour essayer l'interface sans compte : `gitui --fake`.
@@ -37,20 +37,20 @@ session graphique), il est écrit dans `~/.config/gitui/token` en mode 0600.
 
 ## Configuration
 
-`~/.config/gitui/config.toml` (le dossier suit `os.UserConfigDir()`) :
+`~/.config/gitui/config.yaml` (le dossier suit `os.UserConfigDir()`) :
 
-```toml
-client_id = "Iv1.xxxxxxxxxxxx"
-scopes    = ["repo", "read:org"]   # défaut
-theme     = "auto"                 # auto | light | dark
+```yaml
+client_id: Iv1.xxxxxxxxxxxx
+scopes: [repo, read:org]   # défaut
+theme: auto                # auto | light | dark
 
-# La table [keys] doit venir après les clés ci-dessus.
-[keys]
-merge = ["M"]
-quit  = ["q", "x"]
+keys:
+  merge: [M]
+  quit: [q, x]
 ```
 
-`GITUI_CLIENT_ID` l'emporte sur `client_id`. `theme = "auto"` suit la couleur de
+`GITUI_CLIENT_ID` l'emporte sur `client_id`. Une clé inconnue (faute de frappe
+comprise) est refusée au démarrage. `theme = "auto"` suit la couleur de
 fond du terminal.
 
 ## Raccourcis
@@ -97,7 +97,7 @@ cmd/gitui            point d'entrée
 internal/domain      types neutres (Repo, PullRequest, Issue, …)
 internal/provider    interface Provider ; github/ (réel) et fake/ (hors ligne)
 internal/auth        device flow + stockage du token
-internal/config      lecture de config.toml
+internal/config      lecture de config.yaml
 internal/browser     ouverture d'URL
 internal/tui         modèles Bubble Tea (une pile d'écrans)
 ```
