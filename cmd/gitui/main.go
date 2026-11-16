@@ -28,6 +28,10 @@ func main() {
 
 func run(useFake bool) error {
 	cfgPath := config.Path()
+	// A read-only home must not prevent using the app: warn and carry on.
+	if _, err := config.EnsureFile(cfgPath); err != nil {
+		fmt.Fprintf(os.Stderr, "gitui : impossible de créer %s : %v\n", cfgPath, err)
+	}
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
 		return err

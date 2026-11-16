@@ -37,7 +37,9 @@ session graphique), il est écrit dans `~/.config/gitui/token` en mode 0600.
 
 ## Configuration
 
-`~/.config/gitui/config.yaml` (le dossier suit `os.UserConfigDir()`) :
+`~/.config/gitui/config.yaml` (le dossier suit `os.UserConfigDir()`). Il est créé
+automatiquement au premier lancement, avec les valeurs par défaut commentées ;
+un fichier existant n'est jamais modifié. Exemple :
 
 ```yaml
 client_id: Iv1.xxxxxxxxxxxx

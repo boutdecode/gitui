@@ -53,6 +53,52 @@ func Path() string {
 	return filepath.Join(d, "config.yaml")
 }
 
+// template is written on first launch. Every active line equals the built-in
+// default, so creating the file never changes behavior.
+const template = `# Configuration de gitui.
+
+# Client ID d'une OAuth App GitHub avec "Enable Device Flow" activé
+# (Settings > Developer settings > OAuth Apps). Il est public.
+# Peut aussi être donné via la variable d'environnement GITUI_CLIENT_ID.
+# client_id: Iv1.xxxxxxxxxxxx
+
+# Permissions demandées à la connexion.
+scopes: [repo, read:org]
+
+# auto (suit le fond du terminal) | light | dark
+theme: auto
+
+# Raccourcis personnalisés : action -> liste de touches.
+# Actions : voir le README. ctrl+c quitte toujours.
+# keys:
+#   merge: [M]
+#   quit: [q, x]
+`
+
+// EnsureFile creates a commented default config at path if none exists. It
+// never overwrites an existing file; created reports whether it wrote one.
+func EnsureFile(path string) (created bool, err error) {
+	if path == "" {
+		return false, errors.New("chemin de configuration introuvable")
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return false, err
+	}
+	// O_EXCL: atomic "create only if absent", safe against concurrent launches.
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if errors.Is(err, fs.ErrExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if _, err := f.WriteString(template); err != nil {
+		f.Close()
+		return false, err
+	}
+	return true, f.Close()
+}
+
 // decodeFile fills c from a YAML file. A missing or empty file is fine;
 // unknown fields are rejected so a typo like "clientid" is not silently ignored.
 func decodeFile(path string, c *Config) error {

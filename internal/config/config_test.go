@@ -101,3 +101,62 @@ func TestLoadYAMLEdgeCases(t *testing.T) {
 		t.Fatalf("%+v %v", c, err)
 	}
 }
+
+func TestEnsureFileCreatesDefaultConfig(t *testing.T) {
+	t.Setenv(EnvClientID, "")
+	p := filepath.Join(t.TempDir(), "nested", "gitui", "config.yaml")
+
+	created, err := EnsureFile(p)
+	if err != nil || !created {
+		t.Fatalf("created=%v err=%v", created, err)
+	}
+	fi, err := os.Stat(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode().Perm() != 0o600 {
+		t.Fatalf("file mode = %v", fi.Mode().Perm())
+	}
+	if di, _ := os.Stat(filepath.Dir(p)); di.Mode().Perm() != 0o700 {
+		t.Fatalf("dir mode = %v", di.Mode().Perm())
+	}
+
+	// the generated file must parse and behave exactly like the defaults
+	c, err := Load(p)
+	if err != nil {
+		t.Fatalf("generated file does not load: %v", err)
+	}
+	d := defaults()
+	if c.Theme != d.Theme || c.ClientID != "" || len(c.Keys) != 0 ||
+		len(c.Scopes) != len(d.Scopes) || c.Scopes[0] != d.Scopes[0] || c.Scopes[1] != d.Scopes[1] {
+		t.Fatalf("template differs from defaults: %+v", c)
+	}
+}
+
+func TestEnsureFileNeverOverwrites(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(p, []byte("theme: dark\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	created, err := EnsureFile(p)
+	if err != nil || created {
+		t.Fatalf("created=%v err=%v", created, err)
+	}
+	if b, _ := os.ReadFile(p); string(b) != "theme: dark\n" {
+		t.Fatalf("existing config was modified: %q", b)
+	}
+}
+
+func TestEnsureFileErrors(t *testing.T) {
+	if _, err := EnsureFile(""); err == nil {
+		t.Fatal("empty path must error")
+	}
+	// parent is a regular file: directory creation must fail cleanly
+	blocker := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(blocker, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := EnsureFile(filepath.Join(blocker, "config.yaml")); err == nil {
+		t.Fatal("expected an error")
+	}
+}
