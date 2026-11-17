@@ -8,7 +8,7 @@ import (
 
 // The READMEs document every rebindable action; keep them in sync.
 func TestReadmeDocumentsEveryAction(t *testing.T) {
-	for _, file := range []string{"README.md", "README.fr.md"} {
+	for _, file := range []string{"README.md"} {
 		b, err := os.ReadFile("../../" + file)
 		if err != nil {
 			t.Fatal(err)

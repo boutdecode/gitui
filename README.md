@@ -1,7 +1,5 @@
 # gitui
 
-**English** · [Français](README.fr.md)
-
 A terminal Git client built with the [Charm](https://charm.land) stack
 (Bubble Tea v2, Bubbles, Lip Gloss). First provider: **GitHub**.
 
