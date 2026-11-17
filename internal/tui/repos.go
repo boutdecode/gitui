@@ -91,7 +91,28 @@ func repoHeader(w int) string {
 		fitRight("★", colStars) + " " + fitRight("MAJ", colWhen))
 }
 
+// orgItem is one organization in the Organisations tab.
+type orgItem struct{ o domain.Org }
+
+func (i orgItem) FilterValue() string { return i.o.Login + " " + i.o.Description }
+
+func (i orgItem) Row(w int, sel bool) string {
+	name := min(max(w/3, 12), 32)
+	line := marker(sel) + " " + fit(i.o.Login, name) + " " + fit(i.o.Description, max(w-name-3, 1))
+	switch {
+	case sel:
+		return selectLine(line, w, true)
+	}
+	return pinkStyle.Render(marker(sel)) + " " + blueStyle.Render(fit(i.o.Login, name)) + " " +
+		dimStyle.Render(fit(i.o.Description, max(w-name-3, 1)))
+}
+
 type (
+	orgsLoadedMsg []domain.Org
+	orgReposMsg   struct {
+		org   string
+		repos []domain.Repo
+	}
 	reposLoadedMsg struct {
 		tab   int
 		repos []domain.Repo
@@ -121,6 +142,11 @@ type reposScreen struct {
 	filter, sortBy int
 	w, h           int
 
+	orgs       []domain.Org
+	orgRepos   map[string][]domain.Repo
+	org        string // organization whose repositories are shown ("" = the list of organizations)
+	loadingOrg bool
+
 	counts  map[string][2]int // repo -> open PRs, open issues
 	pending map[string]bool
 	lastSel string
@@ -132,7 +158,7 @@ func newReposScreen(p provider.Provider, rec *recents.Store) *reposScreen {
 	return &reposScreen{
 		p: p, recents: rec, list: newRowList(1, 0),
 		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
-		counts:  map[string][2]int{}, pending: map[string]bool{},
+		counts:  map[string][2]int{}, pending: map[string]bool{}, orgRepos: map[string][]domain.Repo{},
 		open: keyOpenItem, filterKey: bind("filter"), star: bind("star"), sortKey: bind("sort"),
 	}
 }
@@ -144,6 +170,9 @@ func (s *reposScreen) Header() string {
 	if name == "github" {
 		name = "GitHub"
 	}
+	if s.org != "" {
+		return name + dimStyle.Render(" · Organisations › ") + purpleStyle.Render(s.org)
+	}
 	return name + dimStyle.Render(" · Dépôts")
 }
 
@@ -151,7 +180,10 @@ func (s *reposScreen) Tabs() ([]tab, int) {
 	tabs := make([]tab, repoTabCount)
 	for i := range tabs {
 		tabs[i] = tab{Label: repoTabLabels[i], Count: -1}
-		if s.loaded[i] && i != repoTabRecent {
+		switch {
+		case i == repoTabOrgs && s.loaded[i]:
+			tabs[i].Count = len(s.orgs)
+		case s.loaded[i] && i != repoTabRecent && i != repoTabOrgs:
 			tabs[i].Count = len(s.data[i])
 		}
 	}
@@ -159,7 +191,7 @@ func (s *reposScreen) Tabs() ([]tab, int) {
 }
 
 func (s *reposScreen) SwitchTab(i int) tea.Cmd {
-	s.tab = i
+	s.tab, s.org = i, ""
 	s.list.ResetFilter()
 	s.rebuild()
 	return s.load(i)
@@ -194,7 +226,11 @@ func (s *reposScreen) load(tab int) tea.Cmd {
 		case repoTabStarred:
 			repos, err = p.ListStarred(ctx)
 		case repoTabOrgs:
-			repos, err = listAllOrgRepos(ctx, p)
+			orgs, err := p.ListOrgs(ctx)
+			if err != nil {
+				return failedLoadMsg{tab, err}
+			}
+			return orgsLoadedMsg(orgs)
 		}
 		if err != nil {
 			return failedLoadMsg{tab, err}
@@ -209,26 +245,45 @@ type failedLoadMsg struct {
 	err error
 }
 
-func listAllOrgRepos(ctx context.Context, p provider.Provider) ([]domain.Repo, error) {
-	orgs, err := p.ListOrgs(ctx)
-	if err != nil {
-		return nil, err
+// loadOrgRepos fetches the repositories of one organization.
+func (s *reposScreen) loadOrgRepos(org string) tea.Cmd {
+	if s.loadingOrg {
+		return nil
 	}
-	var all []domain.Repo
-	for _, o := range orgs {
-		rs, err := p.ListOrgRepos(ctx, o.Login)
+	s.loadingOrg = true
+	p := s.p
+	return tea.Batch(func() tea.Msg {
+		repos, err := p.ListOrgRepos(context.Background(), org)
 		if err != nil {
-			return nil, err
+			return orgFailedMsg{err}
 		}
-		all = append(all, rs...)
-	}
-	return all, nil
+		return orgReposMsg{org, repos}
+	}, s.spinner.Tick)
 }
+
+type orgFailedMsg struct{ err error }
+
+// inOrgList reports whether the table shows organizations, not repositories.
+func (s *reposScreen) inOrgList() bool { return s.tab == repoTabOrgs && s.org == "" }
 
 // rebuild applies the visibility filter and sort to the active tab.
 func (s *reposScreen) rebuild() {
+	if s.inOrgList() {
+		orgs := append([]domain.Org(nil), s.orgs...)
+		sort.Slice(orgs, func(i, j int) bool { return strings.ToLower(orgs[i].Login) < strings.ToLower(orgs[j].Login) })
+		items := make([]list.Item, len(orgs))
+		for i, o := range orgs {
+			items[i] = orgItem{o}
+		}
+		s.list.SetItems(items)
+		return
+	}
+	src := s.data[s.tab]
+	if s.tab == repoTabOrgs {
+		src = s.orgRepos[s.org]
+	}
 	var vis []domain.Repo
-	for _, r := range s.data[s.tab] {
+	for _, r := range src {
 		if repoMatches(r, s.filter) {
 			vis = append(vis, r)
 		}
@@ -254,6 +309,11 @@ func (s *reposScreen) rebuild() {
 func (s *reposScreen) selected() (domain.Repo, bool) {
 	it, ok := s.list.SelectedItem().(repoItem)
 	return it.r, ok
+}
+
+func (s *reposScreen) selectedOrg() (domain.Org, bool) {
+	it, ok := s.list.SelectedItem().(orgItem)
+	return it.o, ok
 }
 
 func (s *reposScreen) Update(msg tea.Msg) (screen, tea.Cmd) {
@@ -282,6 +342,23 @@ func (s *reposScreen) update(msg tea.Msg) tea.Cmd {
 			s.rebuild()
 		}
 		return nil
+	case orgsLoadedMsg:
+		s.loading[repoTabOrgs], s.loaded[repoTabOrgs] = false, true
+		s.orgs = msg
+		if s.tab == repoTabOrgs {
+			s.rebuild()
+		}
+		return nil
+	case orgReposMsg:
+		s.loadingOrg = false
+		s.orgRepos[msg.org] = msg.repos
+		if s.org == msg.org {
+			s.rebuild()
+		}
+		return nil
+	case orgFailedMsg:
+		s.loadingOrg = false
+		return fail(msg.err)
 	case failedLoadMsg:
 		s.loading[msg.tab] = false
 		return fail(msg.err)
@@ -289,6 +366,7 @@ func (s *reposScreen) update(msg tea.Msg) tea.Cmd {
 		for i := range s.loading {
 			s.loading[i] = false
 		}
+		s.loadingOrg = false
 		return nil
 	case selTickMsg:
 		r, ok := s.selected()
@@ -345,10 +423,15 @@ func (s *reposScreen) anyLoading() bool {
 			return true
 		}
 	}
-	return false
+	return s.loadingOrg
 }
 
 func (s *reposScreen) handleKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
+	if s.tab == repoTabOrgs {
+		if cmd, handled := s.handleOrgKey(msg); handled {
+			return cmd, true
+		}
+	}
 	switch {
 	case key.Matches(msg, s.filterKey):
 		s.filter = (s.filter + 1) % len(repoFilters)
@@ -385,6 +468,45 @@ func (s *reposScreen) handleKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 	return nil, false
 }
 
+// handleOrgKey drives the Organisations tab: enter opens an organization,
+// back returns to the list.
+func (s *reposScreen) handleOrgKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
+	switch {
+	case s.org != "" && key.Matches(msg, keys.Back):
+		s.org = ""
+		s.list.ResetFilter()
+		s.rebuild()
+		return nil, true
+	case key.Matches(msg, keyRefresh):
+		s.loaded[repoTabOrgs] = false
+		clear(s.orgRepos)
+		if s.org != "" {
+			return s.loadOrgRepos(s.org), true
+		}
+		return s.load(repoTabOrgs), true
+	}
+	if !s.inOrgList() {
+		return nil, false
+	}
+	switch {
+	case key.Matches(msg, s.open):
+		o, ok := s.selectedOrg()
+		if !ok {
+			return nil, true
+		}
+		s.org = o.Login
+		s.list.ResetFilter()
+		s.rebuild()
+		if _, cached := s.orgRepos[o.Login]; cached {
+			return nil, true
+		}
+		return s.loadOrgRepos(o.Login), true
+	case key.Matches(msg, s.filterKey), key.Matches(msg, s.sortKey), key.Matches(msg, s.star), key.Matches(msg, keyBrowser):
+		return nil, true // repository-only actions
+	}
+	return nil, false
+}
+
 // remember records an opened repository; failures are not worth interrupting for.
 func (s *reposScreen) remember(r domain.Repo) tea.Cmd {
 	if s.recents == nil {
@@ -401,6 +523,13 @@ func (s *reposScreen) applyStar(r domain.Repo, on bool) {
 		for i := range s.data[t] {
 			if s.data[t][i].FullName() == r.FullName() {
 				s.data[t][i].Starred = on
+			}
+		}
+	}
+	for _, rs := range s.orgRepos {
+		for i := range rs {
+			if rs[i].FullName() == r.FullName() {
+				rs[i].Starred = on
 			}
 		}
 	}
@@ -438,19 +567,30 @@ func (s *reposScreen) leftWidth() (int, int) {
 }
 
 func (s *reposScreen) View() string {
-	bar := toolbar(s.w, s.list, "Rechercher un dépôt…",
-		pill("visibilité", repoFilters[s.filter]), pill("tri", repoSorts[s.sortBy]))
+	var bar string
+	if s.inOrgList() {
+		bar = toolbar(s.w, s.list, "Rechercher une organisation…")
+	} else {
+		bar = toolbar(s.w, s.list, "Rechercher un dépôt…",
+			pill("visibilité", repoFilters[s.filter]), pill("tri", repoSorts[s.sortBy]))
+	}
 	lw, rw := s.leftWidth()
 	ph := max(s.h-toolbarHeight, 3)
 
 	var table string
 	switch {
 	case s.loading[s.tab] && !s.loaded[s.tab]:
-		table = s.spinner.View() + " chargement des dépôts…"
+		table = s.spinner.View() + " chargement…"
+	case s.loadingOrg && len(s.list.Items()) == 0:
+		table = s.spinner.View() + " chargement des dépôts de " + s.org + "…"
 	case len(s.list.Items()) == 0:
 		table = dimStyle.Render(s.emptyText())
 	default:
-		table = repoHeader(lw-4) + "\n" + s.list.View()
+		hdr := repoHeader(lw - 4)
+		if s.inOrgList() {
+			hdr = dimStyle.Render("  ORGANISATION")
+		}
+		table = hdr + "\n" + s.list.View()
 	}
 	if rw == 0 {
 		return bar + "\n" + pane(table, lw, ph, true)
@@ -463,6 +603,9 @@ func (s *reposScreen) emptyText() string {
 	if s.tab == repoTabRecent {
 		return "Aucun dépôt ouvert récemment."
 	}
+	if s.inOrgList() {
+		return "Aucune organisation."
+	}
 	if s.loaded[s.tab] && len(s.data[s.tab]) > 0 {
 		return "Aucun dépôt ne correspond au filtre."
 	}
@@ -471,6 +614,9 @@ func (s *reposScreen) emptyText() string {
 
 // detail is the right-hand summary of the selected repository.
 func (s *reposScreen) detail(w int) string {
+	if s.inOrgList() {
+		return s.orgDetail(w)
+	}
 	r, ok := s.selected()
 	if !ok {
 		return ""
@@ -513,9 +659,33 @@ func (s *reposScreen) detail(w int) string {
 	return b.String()
 }
 
+func (s *reposScreen) orgDetail(w int) string {
+	o, ok := s.selectedOrg()
+	if !ok {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(pinkStyle.Bold(true).Render(o.Login) + "\n")
+	if o.Description != "" {
+		b.WriteString(dimStyle.Render(fit(o.Description, w)) + "\n")
+	}
+	b.WriteString(rule(w, "") + "\n")
+	if rs, ok := s.orgRepos[o.Login]; ok {
+		b.WriteString(fmt.Sprintf("%d dépôts\n", len(rs)))
+	}
+	b.WriteString("\n" + keyCapStyle.Render(s.open.Help().Key) + dimStyle.Render(" voir les dépôts"))
+	return b.String()
+}
+
 func (s *reposScreen) Capturing() bool { return s.list.FilterState() == list.Filtering }
 
 func (s *reposScreen) Keys() []key.Binding {
+	if s.inOrgList() {
+		return []key.Binding{s.open, keySearch, keySwitch, keyRefresh}
+	}
+	if s.org != "" {
+		return []key.Binding{s.open, keySearch, s.star, keys.Back, keySwitch, s.sortKey, s.filterKey, keyRefresh}
+	}
 	return []key.Binding{s.open, keySearch, s.star, keySwitch, s.sortKey, s.filterKey, keyRefresh, keyBrowser}
 }
 

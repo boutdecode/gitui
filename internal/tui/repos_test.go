@@ -24,7 +24,9 @@ func loadedRepos(t *testing.T, rec *recents.Store) *reposScreen {
 func names(s *reposScreen) []string {
 	var out []string
 	for _, it := range s.list.Items() {
-		out = append(out, it.(repoItem).r.Name)
+		if r, ok := it.(repoItem); ok {
+			out = append(out, r.r.Name)
+		}
 	}
 	return out
 }
@@ -165,4 +167,83 @@ func TestReposCountsDebouncedPerSelection(t *testing.T) {
 		t.Fatal("stale tick must be ignored")
 	}
 	_ = domain.Repo{}
+}
+
+func TestOrganizationsTabListsOrgsThenTheirRepos(t *testing.T) {
+	s := loadedRepos(t, nil)
+	cmd := s.SwitchTab(repoTabOrgs)
+	if cmd == nil || !s.loading[repoTabOrgs] {
+		t.Fatal("first visit of Organisations must load it")
+	}
+	orgs, _ := fake.New().ListOrgs(context.Background())
+	s.Update(orgsLoadedMsg(orgs))
+
+	// only organizations, no repositories
+	if got := names(s); len(got) != 0 {
+		t.Fatalf("org list must not contain repos: %v", got)
+	}
+	v := plain(s.View())
+	if !strings.Contains(v, "charmbracelet") || strings.Contains(v, "bubbles") {
+		t.Fatalf("expected only the organization:\n%s", v)
+	}
+	if tabs, _ := s.Tabs(); tabs[repoTabOrgs].Count != 1 {
+		t.Fatalf("tab count = %d, want the number of orgs", tabs[repoTabOrgs].Count)
+	}
+
+	// enter drills into the organization
+	_, cmd = s.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if s.org != "charmbracelet" || cmd == nil {
+		t.Fatalf("org = %q cmd=%v", s.org, cmd)
+	}
+	repos, _ := fake.New().ListOrgRepos(context.Background(), "charmbracelet")
+	s.Update(orgReposMsg{"charmbracelet", repos})
+	if got := names(s); len(got) != 1 || got[0] != "bubbles" {
+		t.Fatalf("org repos = %v", got)
+	}
+	if h := plain(s.Header()); !strings.Contains(h, "charmbracelet") {
+		t.Fatalf("header = %q", h)
+	}
+
+	// esc goes back to the list of organizations
+	s.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	if s.org != "" || len(names(s)) != 0 || len(s.list.Items()) != 1 {
+		t.Fatalf("esc should return to the org list (org=%q)", s.org)
+	}
+	// re-entering uses the cache: no new request
+	if _, cmd := s.Update(tea.KeyPressMsg{Code: tea.KeyEnter}); cmd != nil {
+		t.Fatal("cached organization must not reload")
+	}
+	if got := names(s); len(got) != 1 {
+		t.Fatalf("cached repos not shown: %v", got)
+	}
+}
+
+func TestOrgRepoOpensCodeAndLeavingTabResets(t *testing.T) {
+	s := loadedRepos(t, nil)
+	s.SwitchTab(repoTabOrgs)
+	orgs, _ := fake.New().ListOrgs(context.Background())
+	s.Update(orgsLoadedMsg(orgs))
+	s.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	repos, _ := fake.New().ListOrgRepos(context.Background(), "charmbracelet")
+	s.Update(orgReposMsg{"charmbracelet", repos})
+	_, cmd := s.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	var pushed screen
+	switch m := cmd().(type) {
+	case pushMsg: // no recents store: tea.Batch collapses to the single command
+		pushed = m.s
+	case tea.BatchMsg:
+		for _, c := range m {
+			if pm, ok := c().(pushMsg); ok {
+				pushed = pm.s
+			}
+		}
+	}
+	if _, ok := pushed.(*codeScreen); !ok {
+		t.Fatalf("enter on an org repo should open Code, got %T", pushed)
+	}
+	s.SwitchTab(repoTabMine)
+	s.SwitchTab(repoTabOrgs)
+	if s.org != "" {
+		t.Fatal("returning to the tab must show the organizations again")
+	}
 }
