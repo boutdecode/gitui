@@ -22,6 +22,12 @@ type AuthOptions struct {
 	Store       auth.TokenStore
 	NewProvider func(token string) (provider.Provider, error)
 	ConfigPath  string // only used in help text
+
+	// StaticToken, when set, is a personal access token that replaces the
+	// OAuth login. It is verified but never stored. StaticSource names where
+	// it came from (e.g. "GITUI_TOKEN"), for messages only.
+	StaticToken  string
+	StaticSource string
 }
 
 type loginState int
@@ -40,6 +46,11 @@ type (
 	storedTokenMsg struct {
 		token string
 		err   error
+	}
+	// staticVerifiedMsg is the outcome of checking AuthOptions.StaticToken.
+	staticVerifiedMsg struct {
+		gen int
+		err error
 	}
 	deviceCodeMsg struct {
 		gen int
@@ -82,8 +93,41 @@ func newLoginScreen(a *AuthOptions) *loginScreen {
 
 func (s *loginScreen) Title() string { return "Connexion" }
 
+func (s *loginScreen) static() bool { return s.a.StaticToken != "" }
+
 func (s *loginScreen) Init() tea.Cmd {
+	if s.static() {
+		return tea.Batch(s.verifyStatic(), s.spinner.Tick)
+	}
 	return tea.Batch(s.checkStored(), s.spinner.Tick)
+}
+
+// verifyStatic checks the personal access token against GitHub. It never
+// touches the token store: a static token is not ours to persist.
+func (s *loginScreen) verifyStatic() tea.Cmd {
+	gen := s.gen
+	return func() tea.Msg {
+		p, err := s.a.NewProvider(s.a.StaticToken)
+		if err != nil {
+			return staticVerifiedMsg{gen, err}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		_, err = p.CurrentUser(ctx)
+		return staticVerifiedMsg{gen, err}
+	}
+}
+
+// staticErr words a verification failure without ever echoing the token.
+func (s *loginScreen) staticErr(err error) error {
+	src := s.a.StaticSource
+	if src == "" {
+		src = "token"
+	}
+	if errors.Is(err, provider.ErrUnauthorized) {
+		return fmt.Errorf("token refusé par GitHub (invalide, expiré ou révoqué), source : %s", src)
+	}
+	return fmt.Errorf("impossible de vérifier le token (source : %s) : %w", src, err)
 }
 
 func (s *loginScreen) checkStored() tea.Cmd {
@@ -150,6 +194,17 @@ func (s *loginScreen) Update(msg tea.Msg) (screen, tea.Cmd) {
 			return s, s.start()
 		}
 
+	case staticVerifiedMsg:
+		if msg.gen != s.gen || s.state != loginChecking {
+			return s, nil
+		}
+		if msg.err != nil {
+			s.fail(s.staticErr(msg.err))
+			return s, nil
+		}
+		token := s.a.StaticToken
+		return s, func() tea.Msg { return authenticatedMsg{token} }
+
 	case deviceCodeMsg:
 		if msg.gen != s.gen {
 			return s, nil
@@ -203,6 +258,13 @@ func (s *loginScreen) Update(msg tea.Msg) (screen, tea.Cmd) {
 		case key.Matches(msg, s.copyKey) && s.state == loginWaiting:
 			return s, tea.SetClipboard(s.dc.UserCode)
 		case key.Matches(msg, s.retryKey) && s.state == loginFailed:
+			if s.static() {
+				// A bad explicit token is re-checked, never bypassed with OAuth.
+				s.gen++
+				s.err = nil
+				s.state = loginChecking
+				return s, tea.Batch(s.verifyStatic(), s.spinner.Tick)
+			}
 			return s, s.start()
 		}
 	}
@@ -213,15 +275,23 @@ func (s *loginScreen) View() string {
 	var body string
 	switch s.state {
 	case loginChecking:
-		body = s.spinner.View() + " recherche d'une session existante…"
+		if s.static() {
+			body = s.spinner.View() + " vérification du token…"
+		} else {
+			body = s.spinner.View() + " recherche d'une session existante…"
+		}
 	case loginNeedClient:
-		body = "Aucun client ID GitHub configuré.\n\n" +
-			"1. Créez une OAuth App (Settings → Developer settings → OAuth Apps)\n" +
-			"   et cochez « Enable Device Flow ».\n" +
-			"2. Renseignez son client ID :\n" +
-			"     - variable d'environnement  GITUI_CLIENT_ID\n"
+		body = "Aucune méthode de connexion configurée.\n\n" +
+			"A. Token d'accès personnel (le plus simple) :\n" +
+			"     - variable d'environnement  GITUI_TOKEN\n"
 		if s.a.ConfigPath != "" {
-			body += fmt.Sprintf("     - ou client_id: … dans %s\n", s.a.ConfigPath)
+			body += fmt.Sprintf("     - ou token: … dans %s (en clair sur disque)\n", s.a.ConfigPath)
+		}
+		body += "\nB. OAuth App (device flow) :\n" +
+			"     1. Settings → Developer settings → OAuth Apps, cochez « Enable Device Flow »\n" +
+			"     2. renseignez son client ID : variable GITUI_CLIENT_ID\n"
+		if s.a.ConfigPath != "" {
+			body += fmt.Sprintf("        ou client_id: … dans %s\n", s.a.ConfigPath)
 		}
 		body += "\nPuis relancez gitui."
 	case loginStarting:
@@ -232,8 +302,12 @@ func (s *loginScreen) View() string {
 			codeStyle.Render(s.dc.UserCode),
 			hintStyle.Render("En attente de votre autorisation…"))
 	case loginFailed:
+		hint := "Appuyez sur r pour réessayer."
+		if s.static() {
+			hint = "Corrigez le token puis relancez gitui, ou appuyez sur r pour revérifier."
+		}
 		body = errorStyle.Render("Connexion impossible : "+errText(s.err)) + "\n\n" +
-			hintStyle.Render("Appuyez sur r pour réessayer.")
+			hintStyle.Render(hint)
 	}
 	return lipgloss.NewStyle().Padding(1, 2).Render(body)
 }

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -158,5 +159,109 @@ func TestEnsureFileErrors(t *testing.T) {
 	}
 	if _, err := EnsureFile(filepath.Join(blocker, "config.yaml")); err == nil {
 		t.Fatal("expected an error")
+	}
+}
+
+func clearTokenEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv(EnvClientID, "")
+	t.Setenv(EnvToken, "")
+	t.Setenv(EnvGitHubToken, "")
+}
+
+func TestLoadTokenSourcesAndPrecedence(t *testing.T) {
+	clearTokenEnv(t)
+	p := filepath.Join(t.TempDir(), "config.yaml")
+	write := func(body string) {
+		t.Helper()
+		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	load := func() Config {
+		t.Helper()
+		c, err := Load(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+
+	// no token anywhere
+	write("theme: auto\n")
+	if c := load(); c.Token != "" || c.TokenSource != "" {
+		t.Fatalf("expected no token: %+v", c)
+	}
+
+	// from the file; whitespace trimmed
+	write("token: '  file-tok \n'\n")
+	if c := load(); c.Token != "file-tok" || c.TokenSource != FileTokenSource {
+		t.Fatalf("file token: %q from %q", c.Token, c.TokenSource)
+	}
+
+	// GITHUB_TOKEN overrides the file; trailing newline trimmed
+	t.Setenv(EnvGitHubToken, "gh-tok\n")
+	if c := load(); c.Token != "gh-tok" || c.TokenSource != EnvGitHubToken {
+		t.Fatalf("GITHUB_TOKEN: %q from %q", c.Token, c.TokenSource)
+	}
+
+	// GITUI_TOKEN beats GITHUB_TOKEN
+	t.Setenv(EnvToken, "gitui-tok")
+	if c := load(); c.Token != "gitui-tok" || c.TokenSource != EnvToken {
+		t.Fatalf("GITUI_TOKEN: %q from %q", c.Token, c.TokenSource)
+	}
+
+	// blank values are ignored, falling back to the next source
+	t.Setenv(EnvToken, "  \n")
+	t.Setenv(EnvGitHubToken, "")
+	if c := load(); c.Token != "file-tok" || c.TokenSource != FileTokenSource {
+		t.Fatalf("blank env should fall back to file: %q from %q", c.Token, c.TokenSource)
+	}
+}
+
+func TestTokenSourceIsNotReadFromFile(t *testing.T) {
+	clearTokenEnv(t)
+	p := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(p, []byte("TokenSource: sneaky\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(p); err == nil {
+		t.Fatal("TokenSource must not be settable from the file")
+	}
+}
+
+func TestInsecurePermissions(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(p, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if InsecurePermissions(p) {
+		t.Fatal("0600 is fine")
+	}
+	for _, mode := range []os.FileMode{0o644, 0o640, 0o602} {
+		if err := os.Chmod(p, mode); err != nil {
+			t.Fatal(err)
+		}
+		if !InsecurePermissions(p) {
+			t.Fatalf("%v should be flagged", mode)
+		}
+	}
+	if InsecurePermissions(filepath.Join(t.TempDir(), "missing")) {
+		t.Fatal("a missing file is not flagged")
+	}
+}
+
+func TestTemplateStillLoadsWithTokenDocs(t *testing.T) {
+	clearTokenEnv(t)
+	p := filepath.Join(t.TempDir(), "config.yaml")
+	if _, err := EnsureFile(p); err != nil {
+		t.Fatal(err)
+	}
+	c, err := Load(p)
+	if err != nil || c.Token != "" || c.TokenSource != "" {
+		t.Fatalf("template must not define a token: %+v %v", c, err)
+	}
+	if b, _ := os.ReadFile(p); !strings.Contains(string(b), "GITUI_TOKEN") {
+		t.Fatal("template should document GITUI_TOKEN")
 	}
 }

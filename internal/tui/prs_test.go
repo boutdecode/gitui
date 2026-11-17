@@ -21,27 +21,36 @@ func (r *recordingProvider) ListPullRequests(ctx context.Context, repo domain.Re
 	return r.Provider.ListPullRequests(ctx, repo, q)
 }
 
-func TestPRFilterCycleReloads(t *testing.T) {
-	p := &recordingProvider{Provider: fake.New()}
-	s := newPRsScreen(p, domain.Repo{Owner: "o", Name: "r"})
-	s.SetSize(80, 20)
+func newTestPRs(p *recordingProvider) *prsScreen {
+	s := newPRsScreen(newRepoCtx(p, domain.Repo{Owner: "o", Name: "r"}))
+	s.SetSize(120, 30)
+	return s
+}
 
-	// initial load
-	msg := s.Init()()
-	for _, m := range msg.(tea.BatchMsg)[:1] {
-		_, _ = s.Update(m())
+// firstBatchCmd returns the list-loading command of a Batch.
+func loadMsg(t *testing.T, cmd tea.Cmd) tea.Msg {
+	t.Helper()
+	b, ok := cmd().(tea.BatchMsg)
+	if !ok {
+		t.Fatal("expected a batch")
 	}
+	return b[0]()
+}
+
+func TestPRScopeCycleReloads(t *testing.T) {
+	p := &recordingProvider{Provider: fake.New()}
+	s := newTestPRs(p)
+
+	_, _ = s.Update(loadMsg(t, s.Init()))
 	if got := p.scopes; len(got) != 1 || got[0] != domain.ScopeAll {
 		t.Fatalf("initial scopes = %v", got)
 	}
 
-	// pressing f switches to "à relire" and reloads with that scope
-	_, cmd := s.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
+	_, cmd := s.Update(tea.KeyPressMsg{Code: 'p', Text: "p"})
 	if s.scope != domain.ScopeReviewRequested || !s.loading {
 		t.Fatalf("scope=%v loading=%v", s.scope, s.loading)
 	}
-	batch := cmd().(tea.BatchMsg)
-	loaded := batch[0]()
+	loaded := loadMsg(t, cmd)
 	if p.scopes[len(p.scopes)-1] != domain.ScopeReviewRequested {
 		t.Fatalf("provider saw %v", p.scopes)
 	}
@@ -57,6 +66,54 @@ func TestPRFilterCycleReloads(t *testing.T) {
 	_, _ = s.Update(loaded)
 	if s.loading {
 		t.Fatal("current result should be applied")
+	}
+}
+
+func TestPRStateFilterCycles(t *testing.T) {
+	p := &recordingProvider{Provider: fake.New()}
+	s := newTestPRs(p)
+	var states []domain.State
+	s.c.p = &stateProvider{recordingProvider: p, states: &states}
+	for i := 0; i < len(prStates); i++ {
+		_, cmd := s.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
+		_ = loadMsg(t, cmd)
+	}
+	want := []domain.State{domain.StateClosed, domain.StateMerged, "", domain.StateOpen}
+	if len(states) != len(want) {
+		t.Fatalf("states = %v, want %v", states, want)
+	}
+	for i := range want {
+		if states[i] != want[i] {
+			t.Fatalf("states = %v, want %v", states, want)
+		}
+	}
+}
+
+type stateProvider struct {
+	*recordingProvider
+	states *[]domain.State
+}
+
+func (s *stateProvider) ListPullRequests(ctx context.Context, repo domain.Repo, q domain.PRQuery) ([]domain.PullRequest, error) {
+	*s.states = append(*s.states, q.State)
+	return s.recordingProvider.ListPullRequests(ctx, repo, q)
+}
+
+func TestPRPreviewLoadsDetailsOnSelection(t *testing.T) {
+	s := newTestPRs(&recordingProvider{Provider: fake.New()})
+	prs, _ := fake.New().ListPullRequests(context.Background(), testRepo, domain.PRQuery{})
+	_, _ = s.Update(prsLoadedMsg{gen: 0, prs: prs})
+	if v := plain(s.View()); !strings.Contains(v, "Add feature") || !strings.Contains(v, "chargement des checks") {
+		t.Fatalf("preview should show the PR and a loading hint:\n%s", v)
+	}
+	_, cmd := s.Update(prSelTick{number: prs[0].Number})
+	msg := cmd()
+	_, _ = s.Update(msg)
+	v := plain(s.View())
+	for _, want := range []string{"build (ubuntu)", "renderer.go", "+84", "✓ CI"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("preview lacks %q:\n%s", want, v)
+		}
 	}
 }
 

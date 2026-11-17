@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -15,7 +16,13 @@ import (
 const (
 	// EnvClientID overrides client_id from the config file.
 	EnvClientID = "GITUI_CLIENT_ID"
-	dirName     = "gitui"
+	// EnvToken and EnvGitHubToken provide a personal access token. They
+	// override the config file; EnvToken wins over EnvGitHubToken.
+	EnvToken       = "GITUI_TOKEN"
+	EnvGitHubToken = "GITHUB_TOKEN"
+	// FileTokenSource labels a token that comes from the config file.
+	FileTokenSource = "config.yaml"
+	dirName         = "gitui"
 )
 
 type Config struct {
@@ -26,6 +33,12 @@ type Config struct {
 	Scopes []string `yaml:"scopes"`
 	// Theme is "auto" (default, follows the terminal), "light" or "dark".
 	Theme string `yaml:"theme"`
+	// Token is a personal access token. When set (here or via the
+	// environment) it replaces the OAuth login entirely.
+	Token string `yaml:"token"`
+	// TokenSource says where Token came from (EnvToken, EnvGitHubToken,
+	// FileTokenSource, or "" if none); it is never read from the file.
+	TokenSource string `yaml:"-"`
 	// Keys maps an action name to its keys, e.g. merge = ["M"].
 	// Names are validated by the TUI, which owns the action list.
 	Keys map[string][]string `yaml:"keys"`
@@ -61,6 +74,11 @@ const template = `# Configuration de gitui.
 # (Settings > Developer settings > OAuth Apps). Il est public.
 # Peut aussi être donné via la variable d'environnement GITUI_CLIENT_ID.
 # client_id: Iv1.xxxxxxxxxxxx
+
+# Personal Access Token GitHub : remplace la connexion OAuth (client_id inutile).
+# ATTENTION : stocké en clair sur disque. Préférez la variable d'environnement
+# GITUI_TOKEN (qui l'emporte sur cette valeur). Gardez ce fichier en mode 0600.
+# token: ghp_xxxxxxxxxxxxxxxxxxxx
 
 # Permissions demandées à la connexion.
 scopes: [repo, read:org]
@@ -130,6 +148,18 @@ func Load(path string) (Config, error) {
 	if v := os.Getenv(EnvClientID); v != "" {
 		c.ClientID = v
 	}
+	// Whitespace is trimmed: env values often carry a trailing newline.
+	c.Token = strings.TrimSpace(c.Token)
+	c.TokenSource = ""
+	if c.Token != "" {
+		c.TokenSource = FileTokenSource
+	}
+	for _, name := range []string{EnvToken, EnvGitHubToken} {
+		if v := strings.TrimSpace(os.Getenv(name)); v != "" {
+			c.Token, c.TokenSource = v, name
+			break
+		}
+	}
 	if len(c.Scopes) == 0 {
 		c.Scopes = defaults().Scopes
 	}
@@ -139,4 +169,11 @@ func Load(path string) (Config, error) {
 		return c, fmt.Errorf("theme %q invalide dans %s (attendu : auto, light ou dark)", c.Theme, path)
 	}
 	return c, nil
+}
+
+// InsecurePermissions reports whether the file is readable or writable by
+// group/others, which matters when it holds a token.
+func InsecurePermissions(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.Mode().Perm()&0o077 != 0
 }

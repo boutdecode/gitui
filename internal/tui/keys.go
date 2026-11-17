@@ -24,10 +24,16 @@ var defs = map[string]def{
 	"back":    {[]string{"esc", "backspace"}, "esc", "retour"},
 	"logout":  {[]string{"L"}, "L", "déconnexion"},
 	"open":    {[]string{"enter"}, "enter", "ouvrir"},
-	"switch":  {[]string{"tab"}, "tab", "PRs/issues"},
+	"switch":  {[]string{"tab"}, "tab", "onglet"},
 	"browser": {[]string{"o"}, "o", "navigateur"},
 	"search":  {[]string{"/"}, "/", "chercher"},
 	"filter":  {[]string{"f"}, "f", "filtre"},
+	"scope":   {[]string{"p"}, "p", "portée"},
+	"star":    {[]string{"s"}, "s", "favori"},
+	"sort":    {[]string{"t"}, "t", "tri"},
+	"refresh": {[]string{"r"}, "r", "rafraîchir"},
+	"branch":  {[]string{"b"}, "b", "branche"},
+	"parent":  {[]string{"h"}, "h", "dossier parent"},
 	"comment": {[]string{"c"}, "c", "commenter"},
 	"approve": {[]string{"a"}, "a", "approuver"},
 	"merge":   {[]string{"m"}, "m", "merger"},
@@ -43,9 +49,10 @@ var defs = map[string]def{
 // contexts lists the actions that are live together on one screen/mode. Two
 // actions of a context must not share a key, or one silently shadows the other.
 var contexts = map[string][]string{
-	"dépôts":        {"quit", "help", "back", "logout", "open", "browser", "search"},
-	"pull requests": {"quit", "help", "back", "logout", "open", "filter", "switch", "browser", "search"},
-	"issues":        {"quit", "help", "back", "logout", "open", "switch", "browser", "search"},
+	"dépôts":        {"quit", "help", "back", "logout", "open", "browser", "search", "filter", "switch", "star", "sort", "refresh"},
+	"code":          {"quit", "help", "back", "logout", "open", "parent", "branch", "browser", "switch", "refresh"},
+	"pull requests": {"quit", "help", "back", "logout", "open", "filter", "scope", "switch", "browser", "search", "refresh"},
+	"issues":        {"quit", "help", "back", "logout", "open", "filter", "switch", "browser", "search", "refresh"},
 	"détail":        {"quit", "help", "back", "logout", "comment", "approve", "merge", "diff", "browser"},
 	"connexion":     {"quit", "help", "back", "copy", "retry"},
 	"édition":       {"send", "cancel"},
@@ -151,6 +158,7 @@ var (
 	keySwitch   key.Binding
 	keyBrowser  key.Binding
 	keySearch   key.Binding
+	keyRefresh  key.Binding
 )
 
 func init() { rebuildKeys() }
@@ -159,6 +167,7 @@ func rebuildKeys() {
 	keys = globalKeys{Help: bind("help"), Back: bind("back"), Quit: bind("quit"), Logout: bind("logout")}
 	keyOpenItem, keySwitch = bind("open"), bind("switch")
 	keyBrowser, keySearch = bind("browser"), bind("search")
+	keyRefresh = bind("refresh")
 }
 
 // helpKeys merges the active screen's bindings with the global ones.

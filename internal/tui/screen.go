@@ -20,6 +20,18 @@ type screen interface {
 	Keys() []key.Binding
 }
 
+// tabbed is implemented by screens that show a tab bar. The root draws the
+// bar and routes 1-9 and the switch key to SwitchTab.
+type tabbed interface {
+	Tabs() (tabs []tab, active int)
+	// SwitchTab activates tab i; it may replace the screen.
+	SwitchTab(i int) tea.Cmd
+}
+
+// headerer is implemented by screens that describe their context for the
+// header (e.g. "github.com/o/r ⎇ main"); others show the breadcrumb.
+type headerer interface{ Header() string }
+
 type pushMsg struct{ s screen }
 type popMsg struct{}
 type errMsg struct{ err error }

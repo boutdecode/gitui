@@ -326,18 +326,29 @@ func (s *detailScreen) render() {
 
 func (s *detailScreen) conversation() string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render(fmt.Sprintf("#%d %s", s.t.number, s.t.title)))
+	b.WriteString(pinkStyle.Bold(true).Render(fmt.Sprintf("#%d", s.t.number)) + " " + titleStyle.Render(s.t.title))
 	b.WriteString("\n")
-	meta := fmt.Sprintf("%s · %s", authorStyle.Render(s.t.author), s.t.state)
+	badge := openBadge.Render("◉ " + string(s.t.state))
+	switch s.t.state {
+	case domain.StateMerged:
+		badge = mergedBadge.Render("◉ " + string(s.t.state))
+	case domain.StateClosed:
+		badge = closedBadge.Render("◉ " + string(s.t.state))
+	}
+	meta := dimStyle.Render("  ") + authorStyle.Render("@"+s.t.author)
 	if s.t.draft {
-		meta += " · brouillon"
+		meta += dimStyle.Render(" · brouillon")
 	}
 	if s.t.head != "" && s.t.base != "" {
-		meta += fmt.Sprintf(" · %s → %s", s.t.head, s.t.base)
+		meta += dimStyle.Render(fmt.Sprintf(" · %s → %s", s.t.head, s.t.base))
 	}
-	b.WriteString(dimStyle.Render(meta))
+	b.WriteString(badge + meta)
 	if len(s.t.labels) > 0 {
-		b.WriteString("\n" + dimStyle.Render("labels : "+strings.Join(s.t.labels, ", ")))
+		chips := make([]string, len(s.t.labels))
+		for i, l := range s.t.labels {
+			chips[i] = chip(l)
+		}
+		b.WriteString("\n" + strings.Join(chips, " "))
 	}
 	b.WriteString("\n\n")
 	if strings.TrimSpace(s.t.body) == "" {
@@ -350,7 +361,7 @@ func (s *detailScreen) conversation() string {
 		b.WriteString(s.spinner.View() + " chargement des commentaires…")
 		return b.String()
 	}
-	b.WriteString(dimStyle.Render(fmt.Sprintf("── %d commentaire(s) ──", len(s.comments))))
+	b.WriteString(rule(max(s.w, 20), fmt.Sprintf("%d commentaire(s)", len(s.comments))))
 	for _, c := range s.comments {
 		b.WriteString("\n\n" + authorStyle.Render(c.Author) + " " +
 			dimStyle.Render(c.CreatedAt.Format("2006-01-02 15:04")) + "\n" + c.Body)

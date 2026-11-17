@@ -1,22 +1,32 @@
 package tui
 
 import (
-	"charm.land/bubbles/v2/list"
+	"image/color"
+
 	"charm.land/lipgloss/v2"
 )
 
-// Styles are package-level so every screen shares one look; applyTheme
-// rebuilds them for a light or dark terminal background. Bubble Tea runs
-// Update and View on a single goroutine, so reassigning them is safe.
+// Palette (from the design mockup). applyTheme rebuilds it for a light or dark
+// terminal background; screens use the styles below, never raw colors.
 var (
 	isDark = true
 
-	accent lipgloss.Style // only used for its colors, via .GetBackground()
+	colAccent, colBorder, colOnAccent         color.Color
+	colPink, colPurple, colGreen, colYellow   color.Color
+	colBlue, colRed, colDim, colKeyBg, colKey color.Color
+)
 
+// Styles are package-level so every screen shares one look. Bubble Tea runs
+// Update and View on a single goroutine, so reassigning them is safe.
+var (
 	headerStyle, crumbStyle, statusStyle, infoStyle, errorStyle lipgloss.Style
 	codeStyle, urlStyle, hintStyle                              lipgloss.Style
 	titleStyle, authorStyle, dimStyle, promptStyle              lipgloss.Style
 	diffAdd, diffDel, diffHunk, diffFile, diffMeta              lipgloss.Style
+
+	pinkStyle, purpleStyle, greenStyle, yellowStyle, blueStyle, redStyle lipgloss.Style
+	tabActiveStyle, tabInactiveStyle, keyCapStyle, selStyle, openBadge   lipgloss.Style
+	closedBadge, mergedBadge                                             lipgloss.Style
 )
 
 func init() { applyTheme(true) }
@@ -25,60 +35,58 @@ func init() { applyTheme(true) }
 func applyTheme(dark bool) {
 	isDark = dark
 	ld := lipgloss.LightDark(dark)
-	c := func(light, dark string) lipgloss.Style {
-		return lipgloss.NewStyle().Foreground(ld(lipgloss.Color(light), lipgloss.Color(dark)))
-	}
+	hex := func(light, dark string) color.Color { return ld(lipgloss.Color(light), lipgloss.Color(dark)) }
+	fg := func(c color.Color) lipgloss.Style { return lipgloss.NewStyle().Foreground(c) }
 
-	bg := ld(lipgloss.Color("62"), lipgloss.Color("63"))
-	onBg := ld(lipgloss.Color("255"), lipgloss.Color("230"))
-	accent = lipgloss.NewStyle().Background(bg)
+	colAccent = hex("#6a3fe0", "#7d56f4")
+	colOnAccent = lipgloss.Color("#ffffff")
+	colBorder = hex("#cfc8e6", "#3a3358")
+	colPink = hex("#bf2c86", "#ff6ac1")
+	colPurple = hex("#6e4fd1", "#b9a2ff")
+	colGreen = hex("#1a7f37", "#7ee787")
+	colYellow = hex("#8a5a00", "#e3b341")
+	colBlue = hex("#0a5bc4", "#79c0ff")
+	colRed = hex("#cf222e", "#ff7b72")
+	colDim = hex("#5f587a", "#9a93b8")
+	colKeyBg = hex("#e8e4f5", "#2a2540")
+	colKey = hex("#2a2540", "#e6e1f5")
 
-	headerStyle = lipgloss.NewStyle().Bold(true).Foreground(onBg).Background(bg).Padding(0, 1)
-	codeStyle = lipgloss.NewStyle().Bold(true).Foreground(onBg).Background(bg).Padding(0, 2)
+	headerStyle = lipgloss.NewStyle().Bold(true).Foreground(hex("#ffffff", "#14121f")).Background(colPink).Padding(0, 1)
+	codeStyle = lipgloss.NewStyle().Bold(true).Foreground(colOnAccent).Background(colAccent).Padding(0, 2)
 
-	crumbStyle = c("240", "245")
-	statusStyle = c("240", "245")
-	hintStyle = c("240", "245")
-	dimStyle = c("240", "245")
-	diffMeta = c("240", "245")
+	dimStyle = fg(colDim)
+	crumbStyle, statusStyle, hintStyle, diffMeta = dimStyle, dimStyle, dimStyle, dimStyle
 
-	infoStyle = c("28", "42")
-	diffAdd = c("28", "42")
+	greenStyle = fg(colGreen)
+	infoStyle, diffAdd = greenStyle, greenStyle
 
-	errorStyle = c("160", "196").Bold(true)
-	diffDel = c("160", "203")
+	redStyle = fg(colRed)
+	errorStyle = fg(colRed).Bold(true)
+	diffDel = redStyle
 
-	urlStyle = c("27", "39")
-	diffHunk = c("27", "39")
-	authorStyle = c("27", "39").Bold(true)
+	blueStyle = fg(colBlue)
+	urlStyle, diffHunk = blueStyle, blueStyle
+	authorStyle = fg(colBlue).Bold(true)
 
-	promptStyle = c("130", "221").Bold(true)
-	diffFile = c("130", "221").Bold(true)
+	yellowStyle = fg(colYellow)
+	promptStyle = fg(colYellow).Bold(true)
+	diffFile = promptStyle
 
+	pinkStyle = fg(colPink)
+	purpleStyle = fg(colPurple)
 	titleStyle = lipgloss.NewStyle().Bold(true)
+
+	tabActiveStyle = lipgloss.NewStyle().Bold(true).Foreground(colOnAccent).Background(colAccent).Padding(0, 1)
+	tabInactiveStyle = lipgloss.NewStyle().Foreground(colDim).Background(colKeyBg).Padding(0, 1)
+	keyCapStyle = lipgloss.NewStyle().Foreground(colKey).Background(colKeyBg).Padding(0, 1)
+	selStyle = lipgloss.NewStyle().Foreground(colOnAccent).Background(colAccent)
+
+	badge := func(bg string) lipgloss.Style {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#ffffff")).Background(lipgloss.Color(bg)).Padding(0, 1)
+	}
+	openBadge, closedBadge, mergedBadge = badge("#238636"), badge("#cf222e"), badge("#8250df")
 }
 
 // restyler is implemented by screens holding bubbles components whose own
 // styles depend on the background.
 type restyler interface{ Restyle(dark bool) }
-
-func newListModel() list.Model {
-	l := list.New(nil, newDelegate(isDark), 0, 0)
-	l.Styles = list.DefaultStyles(isDark)
-	l.SetShowTitle(false)
-	l.SetShowHelp(false)
-	l.SetShowStatusBar(false)
-	l.KeyMap.Filter.SetKeys(keySearch.Keys()...)
-	return l
-}
-
-func newDelegate(dark bool) list.DefaultDelegate {
-	d := list.NewDefaultDelegate()
-	d.Styles = list.NewDefaultItemStyles(dark)
-	return d
-}
-
-func restyleList(l *list.Model, dark bool) {
-	l.Styles = list.DefaultStyles(dark)
-	l.SetDelegate(newDelegate(dark))
-}

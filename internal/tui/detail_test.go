@@ -78,7 +78,7 @@ func TestDetailShowsConversation(t *testing.T) {
 	s, _ := newPRDetail(t)
 	s.Init()
 	s.Update(commentsLoadedMsg{{Author: "bob", Body: "looks good"}})
-	v := s.View()
+	v := plain(s.View())
 	for _, want := range []string{"#3 Add thing", "the body", "feat → main", "bob", "looks good"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("view missing %q:\n%s", want, v)
@@ -240,8 +240,15 @@ func TestOpenInBrowser(t *testing.T) {
 func TestNavigationReposToDetailAndSiblings(t *testing.T) {
 	m := New(Options{Provider: fake.New()})
 	m = run(t, m, tea.WindowSizeMsg{Width: 100, Height: 30})
-	m = run(t, m, reposLoadedMsg(mustRepos(t)))
-	m = run(t, m, tea.KeyPressMsg{Code: tea.KeyEnter}) // -> PRs
+	m = run(t, m, reposLoadedMsg{tab: repoTabMine, repos: mustRepos(t)})
+	m = run(t, m, tea.KeyPressMsg{Code: tea.KeyEnter}) // -> Code tab
+	if _, ok := m.top().(*codeScreen); !ok {
+		t.Fatalf("enter should open Code, got %T", m.top())
+	}
+	m = run(t, m, tea.KeyPressMsg{Code: '2', Text: "2"}) // -> PRs, stack unchanged
+	if _, ok := m.top().(*prsScreen); !ok || len(m.stack) != 2 {
+		t.Fatalf("2 should swap to PRs in place (stack=%d, %T)", len(m.stack), m.top())
+	}
 	// the PRs are loaded by Init's cmd; deliver them explicitly
 	prs, _ := fake.New().ListPullRequests(context.Background(), testRepo, domain.PRQuery{})
 	m = run(t, m, prsLoadedMsg{gen: 0, prs: prs})
@@ -249,22 +256,19 @@ func TestNavigationReposToDetailAndSiblings(t *testing.T) {
 		t.Fatalf("PR list missing:\n%s", view(m))
 	}
 
-	m = run(t, m, tea.KeyPressMsg{Code: tea.KeyTab}) // sibling: issues, stack unchanged
-	if len(m.stack) != 2 || !strings.Contains(view(m), "Issues") {
-		t.Fatalf("tab should swap to issues in place (stack=%d):\n%s", len(m.stack), view(m))
+	m = run(t, m, tea.KeyPressMsg{Code: tea.KeyTab}) // next tab: issues
+	if _, ok := m.top().(*issuesScreen); !ok || len(m.stack) != 2 {
+		t.Fatalf("tab should go to issues (stack=%d, %T)", len(m.stack), m.top())
 	}
-	m = run(t, m, tea.KeyPressMsg{Code: tea.KeyTab})
-	if _, ok := m.top().(*prsScreen); !ok {
-		t.Fatalf("tab again should return to PRs, got %T", m.top())
-	}
+	m = run(t, m, tea.KeyPressMsg{Code: '2', Text: "2"})
 	m = run(t, m, prsLoadedMsg{gen: 0, prs: prs})
 	m = run(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if _, ok := m.top().(*detailScreen); !ok || len(m.stack) != 3 {
 		t.Fatalf("enter should open detail, got %T stack=%d", m.top(), len(m.stack))
 	}
 	m = run(t, m, tea.KeyPressMsg{Code: tea.KeyEscape})
-	if len(m.stack) != 2 {
-		t.Fatalf("esc should go back, stack=%d", len(m.stack))
+	if _, ok := m.top().(*prsScreen); !ok || len(m.stack) != 2 {
+		t.Fatalf("esc should go back to PRs, stack=%d", len(m.stack))
 	}
 }
 

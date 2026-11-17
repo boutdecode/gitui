@@ -126,15 +126,7 @@ func (p *Provider) ListRepos(ctx context.Context) ([]domain.Repo, error) {
 			return nil, err
 		}
 		for _, r := range repos {
-			out = append(out, domain.Repo{
-				Owner:       r.GetOwner().GetLogin(),
-				Name:        r.GetName(),
-				Description: r.GetDescription(),
-				Private:     r.GetPrivate(),
-				Stars:       r.GetStargazersCount(),
-				URL:         r.GetHTMLURL(),
-				UpdatedAt:   r.GetPushedAt().Time,
-			})
+			out = append(out, repoFrom(r))
 		}
 		if resp.NextPage == 0 {
 			break

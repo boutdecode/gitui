@@ -107,11 +107,11 @@ func TestCtrlCAlwaysQuits(t *testing.T) {
 
 func TestSearchOverrideReachesList(t *testing.T) {
 	resetKeys(t)
-	if err := SetKeyOverrides(map[string][]string{"search": {"s"}}); err != nil {
+	if err := SetKeyOverrides(map[string][]string{"search": {"x"}}); err != nil {
 		t.Fatal(err)
 	}
-	l := newListModel()
-	if got := l.KeyMap.Filter.Keys(); len(got) != 1 || got[0] != "s" {
+	l := newRowList(1, 0)
+	if got := l.KeyMap.Filter.Keys(); len(got) != 1 || got[0] != "x" {
 		t.Fatalf("list filter keys = %v", got)
 	}
 }

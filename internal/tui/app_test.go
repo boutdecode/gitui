@@ -55,7 +55,7 @@ func TestNavigation(t *testing.T) {
 	m := New(Options{Provider: fake.New()})
 	m = run(t, m, tea.WindowSizeMsg{Width: 80, Height: 24})
 	// initial load
-	m = run(t, m, reposLoadedMsg(mustRepos(t)))
+	m = run(t, m, reposLoadedMsg{tab: repoTabMine, repos: mustRepos(t)})
 	if !strings.Contains(view(m), "octocat/hello-world") {
 		t.Fatalf("repos not rendered:\n%s", view(m))
 	}
@@ -63,8 +63,11 @@ func TestNavigation(t *testing.T) {
 	if len(m.stack) != 2 {
 		t.Fatalf("expected 2 screens, got %d", len(m.stack))
 	}
-	if !strings.Contains(view(m), "Pull requests") {
-		t.Fatalf("breadcrumb missing:\n%s", view(m))
+	if _, ok := m.top().(*codeScreen); !ok {
+		t.Fatalf("enter on a repo should open the code tab, got %T", m.top())
+	}
+	if v := view(m); !strings.Contains(v, "Pull requests") || !strings.Contains(v, "octocat/hello-world") {
+		t.Fatalf("tab bar or header missing:\n%s", v)
 	}
 	m = run(t, m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	if len(m.stack) != 1 {

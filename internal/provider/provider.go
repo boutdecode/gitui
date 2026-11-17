@@ -19,6 +19,24 @@ type Provider interface {
 	AddComment(ctx context.Context, repo domain.Repo, number int, body string) error
 	ApprovePullRequest(ctx context.Context, repo domain.Repo, number int, body string) error
 	MergePullRequest(ctx context.Context, repo domain.Repo, number int) error
+
+	// Browsing code.
+	ListBranches(ctx context.Context, repo domain.Repo) ([]string, error)
+	// ListTree lists one directory; path "" is the root and ref "" the default branch.
+	ListTree(ctx context.Context, repo domain.Repo, ref, path string) ([]domain.TreeEntry, error)
+	GetFile(ctx context.Context, repo domain.Repo, ref, path string) (domain.FileContent, error)
+
+	// Repository collections.
+	ListStarred(ctx context.Context) ([]domain.Repo, error)
+	SetStarred(ctx context.Context, repo domain.Repo, starred bool) error
+	ListOrgs(ctx context.Context) ([]domain.Org, error)
+	ListOrgRepos(ctx context.Context, org string) ([]domain.Repo, error)
+
+	// Details loaded on demand for the current selection (each costs API calls).
+	CountOpen(ctx context.Context, repo domain.Repo) (prs, issues int, err error)
+	GetPullRequest(ctx context.Context, repo domain.Repo, number int) (domain.PullRequest, error)
+	ListPullRequestFiles(ctx context.Context, repo domain.Repo, number int) ([]domain.PRFile, error)
+	ListChecks(ctx context.Context, repo domain.Repo, ref string) ([]domain.Check, error)
 }
 
 // ErrUnauthorized means the token is missing, expired or revoked.
