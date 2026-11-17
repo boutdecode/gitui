@@ -29,6 +29,7 @@ type Model struct {
 	user          string // login shown in the header
 	autoTheme     bool   // follow the terminal background
 	recents       *recents.Store
+	transparent   bool // leave the terminal background alone
 }
 
 // Options configures the root model.
@@ -39,12 +40,15 @@ type Options struct {
 	Auth *AuthOptions
 	// Recents remembers opened repositories; nil keeps them in memory only.
 	Recents *recents.Store
+	// Transparent keeps the terminal's own background instead of painting
+	// the theme background.
+	Transparent bool
 	// Theme is "auto" (detect the terminal background), "light" or "dark".
 	Theme string
 }
 
 func New(o Options) Model {
-	m := Model{p: o.Provider, auth: o.Auth, help: help.New(), recents: o.Recents}
+	m := Model{p: o.Provider, auth: o.Auth, help: help.New(), recents: o.Recents, transparent: o.Transparent}
 	switch o.Theme {
 	case "light", "dark":
 		m.setTheme(o.Theme == "dark")
@@ -232,7 +236,7 @@ func (m Model) helpView() string {
 	if h.canLogout {
 		keep++
 	}
-	return helpBar(h.ShortHelp(), m.width, m.help.ShowAll, keep)
+	return helpBar(h.ShortHelp(), m.innerW(), m.help.ShowAll, keep)
 }
 
 // chromeHeight is every line the root draws around the screen body.
@@ -246,7 +250,44 @@ func (m Model) chromeHeight() int {
 
 // layout gives the active screen whatever height is left after chrome.
 func (m *Model) layout() {
-	m.top().SetSize(m.width, max(m.height-m.chromeHeight(), 1))
+	m.top().SetSize(m.innerW(), max(m.innerH()-m.chromeHeight(), 1))
+}
+
+// Margin kept free around the app so it doesn't touch the terminal edges.
+const (
+	marginX = 2
+	marginY = 1
+)
+
+// hasMargin is false on terminals too small to spare the space.
+func (m Model) hasMargin() bool { return m.width >= 60 && m.height >= 16 }
+
+func (m Model) innerW() int {
+	if m.hasMargin() {
+		return m.width - 2*marginX
+	}
+	return m.width
+}
+
+func (m Model) innerH() int {
+	if m.hasMargin() {
+		return m.height - 2*marginY
+	}
+	return m.height
+}
+
+// addMargin surrounds the frame with blank cells (painted later if needed).
+func (m Model) addMargin(frame string) string {
+	if !m.hasMargin() {
+		return frame
+	}
+	pad := strings.Repeat(" ", marginX)
+	lines := strings.Split(frame, "\n")
+	for i, l := range lines {
+		lines[i] = pad + l
+	}
+	blank := strings.Repeat("\n", marginY)
+	return blank + strings.Join(lines, "\n") + blank
 }
 
 func (m Model) headerContext() string {
@@ -261,7 +302,7 @@ func (m Model) headerContext() string {
 }
 
 func (m Model) View() tea.View {
-	parts := []string{headerView(m.width, m.headerContext(), m.user)}
+	parts := []string{headerView(m.innerW(), m.headerContext(), m.user)}
 	if tb, ok := m.top().(tabbed); ok {
 		tabs, active := tb.Tabs()
 		parts = append(parts, tabsView(tabs, active))
@@ -282,10 +323,14 @@ func (m Model) View() tea.View {
 		}
 	}
 
-	body := lipgloss.NewStyle().Height(max(m.height-m.chromeHeight(), 1)).Render(m.top().View())
-	parts = append(parts, body, status, rule(m.width, ""), m.helpView())
+	body := lipgloss.NewStyle().Height(max(m.innerH()-m.chromeHeight(), 1)).Render(m.top().View())
+	parts = append(parts, body, status, rule(m.innerW(), ""), m.helpView())
 
-	v := tea.NewView(lipgloss.JoinVertical(lipgloss.Left, parts...))
+	frame := m.addMargin(lipgloss.JoinVertical(lipgloss.Left, parts...))
+	if !m.transparent {
+		frame = paintBackground(frame, m.width, m.height)
+	}
+	v := tea.NewView(frame)
 	v.AltScreen = true
 	return v
 }

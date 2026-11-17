@@ -14,6 +14,7 @@ var (
 	colAccent, colBorder, colOnAccent         color.Color
 	colPink, colPurple, colGreen, colYellow   color.Color
 	colBlue, colRed, colDim, colKeyBg, colKey color.Color
+	colBg, colFg                              color.Color // screen background and default text
 )
 
 // Styles are package-level so every screen shares one look. Bubble Tea runs
@@ -38,6 +39,8 @@ func applyTheme(dark bool) {
 	hex := func(light, dark string) color.Color { return ld(lipgloss.Color(light), lipgloss.Color(dark)) }
 	fg := func(c color.Color) lipgloss.Style { return lipgloss.NewStyle().Foreground(c) }
 
+	colBg = hex("#faf8ff", "#14121f")
+	colFg = hex("#2a2540", "#e6e1f5")
 	colAccent = hex("#6a3fe0", "#7d56f4")
 	colOnAccent = lipgloss.Color("#ffffff")
 	colBorder = hex("#cfc8e6", "#3a3358")

@@ -6,6 +6,8 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/lipgloss/v2"
+
+	"github.com/kevin/gitui/internal/provider/fake"
 )
 
 func TestHeaderShowsContextAndUser(t *testing.T) {
@@ -86,5 +88,70 @@ func TestSplitViewWidthsAddUp(t *testing.T) {
 	}
 	if canSplit(89) || !canSplit(90) {
 		t.Error("canSplit threshold should be 90")
+	}
+}
+
+func TestBackgroundPaintedUnlessTransparent(t *testing.T) {
+	t.Cleanup(func() { applyTheme(true) })
+	p := fake.New()
+	bg := sgr(48, colBg)
+
+	for _, theme := range []string{"dark", "auto"} {
+		m := New(Options{Provider: p, Theme: theme})
+		m.width, m.height = 60, 10
+		v := m.View().Content
+		if !strings.Contains(v, bg) {
+			t.Fatalf("theme %q: background not painted", theme)
+		}
+		lines := strings.Split(v, "\n")
+		if len(lines) != 10 {
+			t.Fatalf("theme %q: %d lines, want 10", theme, len(lines))
+		}
+		for i, l := range lines {
+			if !strings.HasPrefix(l, sgr(48, colBg)) || lipgloss.Width(l) != 60 {
+				t.Fatalf("theme %q line %d: not a full painted row (width %d)", theme, i, lipgloss.Width(l))
+			}
+		}
+	}
+
+	m := New(Options{Provider: p, Theme: "dark", Transparent: true})
+	m.width, m.height = 60, 10
+	if strings.Contains(m.View().Content, bg) {
+		t.Fatal("--transparent must not paint the background")
+	}
+}
+
+func TestPaintKeepsBackgroundAfterStyleResets(t *testing.T) {
+	t.Cleanup(func() { applyTheme(true) })
+	out := paintBackground("a\x1b[31mb\x1b[0mc", 10, 1)
+	if strings.Count(out, sgr(48, colBg)) < 2 {
+		t.Fatalf("background must be re-applied after a reset: %q", out)
+	}
+}
+
+func TestMarginKeepsAppAwayFromEdges(t *testing.T) {
+	t.Cleanup(func() { applyTheme(true) })
+	m := New(Options{Provider: fake.New(), Theme: "dark", Transparent: true})
+	m.width, m.height = 100, 30
+	m.layout()
+	lines := strings.Split(plain(m.View().Content), "\n")
+	if len(lines) != 30 {
+		t.Fatalf("frame has %d lines, want 30", len(lines))
+	}
+	if strings.TrimSpace(lines[0]) != "" || strings.TrimSpace(lines[29]) != "" {
+		t.Fatalf("first and last rows must be blank margins: %q / %q", lines[0], lines[29])
+	}
+	for i, l := range lines {
+		if lipgloss.Width(l) > 100-marginX {
+			t.Errorf("line %d reaches the right edge (%d cells)", i, lipgloss.Width(l))
+		}
+		if l != "" && !strings.HasPrefix(l, strings.Repeat(" ", marginX)) {
+			t.Errorf("line %d touches the left edge: %q", i, l)
+		}
+	}
+	// tiny terminals keep every cell for the app
+	m.width, m.height = 50, 12
+	if m.hasMargin() {
+		t.Fatal("no margin on a tiny terminal")
 	}
 }

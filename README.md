@@ -69,6 +69,8 @@ tant que vous ne l'aurez pas retiré. Le token n'est jamais affiché.
 
 Pour essayer l'interface sans compte : `gitui --fake`.
 
+L'interface peint le fond du thème (violet très sombre, ou clair). `gitui --transparent` garde à la place le fond de votre terminal.
+
 Le token OAuth est gardé dans le trousseau du système. Sans trousseau (Linux sans
 session graphique), il est écrit dans `~/.config/gitui/token` en mode 0600.
 `L` déconnecte et supprime ce token.

@@ -20,6 +20,7 @@ import (
 func main() {
 	useFake := flag.Bool("fake", false, "utiliser le provider factice (sans connexion)")
 	doLogout := flag.Bool("logout", false, "supprimer les identifiants stockés (trousseau et fichier) et quitter")
+	transparent := flag.Bool("transparent", false, "garder le fond du terminal (ne pas peindre le fond du thème)")
 	flag.Parse()
 
 	if *doLogout {
@@ -30,13 +31,13 @@ func main() {
 		}
 		return
 	}
-	if err := run(*useFake); err != nil {
+	if err := run(*useFake, *transparent); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func run(useFake bool) error {
+func run(useFake, transparent bool) error {
 	cfgPath := config.Path()
 	// A read-only home must not prevent using the app: warn and carry on.
 	if _, err := config.EnsureFile(cfgPath); err != nil {
@@ -53,7 +54,7 @@ func run(useFake bool) error {
 		return fmt.Errorf("%s : %w", cfgPath, err)
 	}
 
-	opts := tui.Options{Theme: cfg.Theme}
+	opts := tui.Options{Theme: cfg.Theme, Transparent: transparent}
 	if !useFake {
 		if dir, err := config.Dir(); err == nil {
 			opts.Recents = recents.New(filepath.Join(dir, "recent.json"))
