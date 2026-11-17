@@ -71,30 +71,50 @@ func selectLine(s string, w int, selected bool) string {
 
 func stripStyle(s string) string { return plain(s) }
 
-// searchBar shows the list's active search ("recherche : bubble█"), or just
-// the hint when idle.
-func searchBar(l list.Model) string {
-	switch {
-	case l.FilterState() == list.Filtering:
-		return dimStyle.Render("recherche : ") + blueStyle.Render(l.FilterValue()+"█")
-	case l.FilterState() == list.FilterApplied:
-		return dimStyle.Render("recherche : ") + blueStyle.Render(l.FilterValue())
+// toolbarHeight is the height of toolbar(): a bordered search box and bordered
+// filter pills side by side.
+const toolbarHeight = 3
+
+// box draws content inside a rounded border; width 0 fits the content.
+func box(content string, width int, active bool) string {
+	bc := colBorder
+	if active {
+		bc = colAccent
 	}
-	return dimStyle.Render("recherche : /")
+	st := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(bc).Padding(0, 1)
+	if width > 0 {
+		st = st.Width(width)
+	}
+	return st.Render(content)
 }
 
-// filterBar draws "filtre : ● a  b  c" with the current option marked, and
-// the right-hand text (e.g. the search bar) pushed to the far edge.
-func filterBar(w int, options []string, current int, right string) string {
-	parts := make([]string, len(options))
-	for i, o := range options {
-		if i == current {
-			parts[i] = pinkStyle.Render("● " + o)
-		} else {
-			parts[i] = dimStyle.Render(o)
-		}
+// pill is a bordered "label : value" filter indicator.
+func pill(label, value string) string {
+	return box(dimStyle.Render(label+" : ")+value, 0, false)
+}
+
+// toolbar renders the search box (taking the remaining width) followed by the
+// filter pills, e.g. "/ Filtrer…   [statut : ouvertes]".
+func toolbar(w int, l list.Model, placeholder string, pills ...string) string {
+	pillsW := 0
+	for _, p := range pills {
+		pillsW += lipgloss.Width(p) + 1
 	}
-	left := dimStyle.Render("filtre : ") + strings.Join(parts, "  ")
-	gap := max(w-lipgloss.Width(left)-lipgloss.Width(right), 2)
-	return left + strings.Repeat(" ", gap) + right
+	slash := pinkStyle.Render("/") + " "
+	var text string
+	active := false
+	switch {
+	case l.FilterState() == list.Filtering:
+		text, active = slash+l.FilterValue()+"█", true
+	case l.FilterState() == list.FilterApplied:
+		text = slash + l.FilterValue()
+	default:
+		text = slash + dimStyle.Render(placeholder)
+	}
+	search := box(fit(text, max(w-pillsW-4, 1)), max(w-pillsW, 6), active)
+	parts := []string{search}
+	for _, p := range pills {
+		parts = append(parts, " ", p)
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, parts...)
 }

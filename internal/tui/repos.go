@@ -425,7 +425,7 @@ func (s *reposScreen) applyStar(r domain.Repo, on bool) {
 func (s *reposScreen) SetSize(w, h int) {
 	s.w, s.h = w, h
 	lw, _ := s.leftWidth()
-	s.list.SetSize(max(lw-4, 1), max(h-1-2-1, 1)) // filter bar, pane border, table header
+	s.list.SetSize(max(lw-4, 1), max(h-toolbarHeight-2-1, 1)) // toolbar, pane border, table header
 }
 
 // leftWidth returns the outer widths of the table pane and the detail pane
@@ -438,10 +438,10 @@ func (s *reposScreen) leftWidth() (int, int) {
 }
 
 func (s *reposScreen) View() string {
-	right := searchBar(s.list)
-	bar := filterBar(s.w, repoFilters, s.filter, dimStyle.Render("tri : "+repoSorts[s.sortBy]+"  ")+right)
+	bar := toolbar(s.w, s.list, "Rechercher un dépôt…",
+		pill("visibilité", repoFilters[s.filter]), pill("tri", repoSorts[s.sortBy]))
 	lw, rw := s.leftWidth()
-	ph := max(s.h-1, 3)
+	ph := max(s.h-toolbarHeight, 3)
 
 	var table string
 	switch {

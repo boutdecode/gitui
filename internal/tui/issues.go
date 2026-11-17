@@ -196,7 +196,7 @@ func (s *issuesScreen) update(msg tea.Msg) tea.Cmd {
 func (s *issuesScreen) SetSize(w, h int) {
 	s.w, s.h = w, h
 	lw, _ := s.widths()
-	s.list.SetSize(max(lw-4, 1), max(h-1-2, 1))
+	s.list.SetSize(max(lw-4, 1), max(h-toolbarHeight-2, 1))
 }
 
 func (s *issuesScreen) widths() (int, int) {
@@ -207,13 +207,9 @@ func (s *issuesScreen) widths() (int, int) {
 }
 
 func (s *issuesScreen) View() string {
-	labels := make([]string, len(issueStates))
-	for i, st := range issueStates {
-		labels[i] = st.label
-	}
-	bar := filterBar(s.w, labels, s.stateIdx, searchBar(s.list))
+	bar := toolbar(s.w, s.list, "Filtrer les issues…", pill("état", issueStates[s.stateIdx].label))
 	lw, rw := s.widths()
-	ph := max(s.h-1, 3)
+	ph := max(s.h-toolbarHeight, 3)
 
 	var left string
 	switch {

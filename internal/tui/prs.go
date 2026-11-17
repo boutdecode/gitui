@@ -306,7 +306,7 @@ func (s *prsScreen) update(msg tea.Msg) tea.Cmd {
 func (s *prsScreen) SetSize(w, h int) {
 	s.w, s.h = w, h
 	lw, _ := s.widths()
-	s.list.SetSize(max(lw-4, 1), max(h-1-2, 1))
+	s.list.SetSize(max(lw-4, 1), max(h-toolbarHeight-2, 1))
 }
 
 func (s *prsScreen) widths() (int, int) {
@@ -317,14 +317,10 @@ func (s *prsScreen) widths() (int, int) {
 }
 
 func (s *prsScreen) View() string {
-	labels := make([]string, len(prStates))
-	for i, st := range prStates {
-		labels[i] = st.label
-	}
-	right := dimStyle.Render("portée: "+scopeLabels[s.scope]+"  ") + searchBar(s.list)
-	bar := filterBar(s.w, labels, s.stateIdx, right)
+	bar := toolbar(s.w, s.list, "Filtrer les pull requests…",
+		pill("état", prStates[s.stateIdx].label), pill("portée", scopeLabels[s.scope]))
 	lw, rw := s.widths()
-	ph := max(s.h-1, 3)
+	ph := max(s.h-toolbarHeight, 3)
 
 	var left string
 	switch {
