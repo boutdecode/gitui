@@ -13,6 +13,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/kevin/gitui/internal/domain"
+	"github.com/kevin/gitui/internal/i18n"
 )
 
 // prStates are the state filters, in display order. A zero state means all.
@@ -20,10 +21,10 @@ var prStates = []struct {
 	label string
 	state domain.State
 }{
-	{"ouvertes", domain.StateOpen},
-	{"fermées", domain.StateClosed},
-	{"fusionnées", domain.StateMerged},
-	{"toutes", ""},
+	{"state|open", domain.StateOpen},
+	{"state|closed", domain.StateClosed},
+	{"state|merged", domain.StateMerged},
+	{"state|any", ""},
 }
 
 var scopes = []domain.PRScope{
@@ -31,10 +32,10 @@ var scopes = []domain.PRScope{
 }
 
 var scopeLabels = map[domain.PRScope]string{
-	domain.ScopeAll:             "tous",
-	domain.ScopeReviewRequested: "à relire",
-	domain.ScopeAssigned:        "assignées",
-	domain.ScopeAuthored:        "les miennes",
+	domain.ScopeAll:             "all",
+	domain.ScopeReviewRequested: "to review",
+	domain.ScopeAssigned:        "assigned",
+	domain.ScopeAuthored:        "mine",
 }
 
 // prExtra is what the preview loads on demand for one pull request.
@@ -81,7 +82,7 @@ func stateDot(st domain.State) string {
 func (i prItem) Row(w int, sel bool) string {
 	title := fmt.Sprintf("#%d %s", i.pr.Number, i.pr.Title)
 	if i.pr.Draft {
-		title = "◌ brouillon  " + title
+		title = "◌ " + i18n.T("draft") + "  " + title
 	}
 	first := marker(sel) + " " + fit(title, max(w-2, 1))
 	meta := "  " + stateDot(i.pr.State) + dimStyle.Render(" @"+i.pr.Author+" · "+ilYa(i.pr.UpdatedAt)+" · ") + ciBadge(i.status)
@@ -134,7 +135,7 @@ func newPRsScreen(c *repoCtx) *prsScreen {
 }
 
 func (s *prsScreen) Title() string {
-	return fmt.Sprintf("%s › Pull requests (%s)", s.c.repo.FullName(), scopeLabels[s.scope])
+	return fmt.Sprintf("%s › Pull requests (%s)", s.c.repo.FullName(), i18n.T(scopeLabels[s.scope]))
 }
 func (s *prsScreen) Header() string { return s.c.header() }
 func (s *prsScreen) Tabs() ([]tab, int) {
@@ -317,17 +318,17 @@ func (s *prsScreen) widths() (int, int) {
 }
 
 func (s *prsScreen) View() string {
-	bar := toolbar(s.w, s.list, "Filtrer les pull requests…",
-		pill("état", prStates[s.stateIdx].label), pill("portée", scopeLabels[s.scope]))
+	bar := toolbar(s.w, s.list, i18n.T("Filter pull requests…"),
+		pill(i18n.T("state"), i18n.T(prStates[s.stateIdx].label)), pill(i18n.T("scope"), i18n.T(scopeLabels[s.scope])))
 	lw, rw := s.widths()
 	ph := max(s.h-toolbarHeight, 3)
 
 	var left string
 	switch {
 	case s.loading:
-		left = s.spinner.View() + " chargement des pull requests…"
+		left = s.spinner.View() + " " + i18n.T("loading pull requests…")
 	case len(s.list.Items()) == 0:
-		left = dimStyle.Render("Aucune pull request.")
+		left = dimStyle.Render(i18n.T("No pull request."))
 	default:
 		left = s.list.View()
 	}
@@ -341,11 +342,11 @@ func (s *prsScreen) View() string {
 func stateBadge(st domain.State) string {
 	switch st {
 	case domain.StateMerged:
-		return mergedBadge.Render("◉ Fusionnée")
+		return mergedBadge.Render("◉ " + i18n.T("Merged"))
 	case domain.StateClosed:
-		return closedBadge.Render("◉ Fermée")
+		return closedBadge.Render("◉ " + i18n.T("Closed"))
 	}
-	return openBadge.Render("◉ Ouverte")
+	return openBadge.Render("◉ " + i18n.T("Open"))
 }
 
 func (s *prsScreen) preview(w int) string {
@@ -365,17 +366,17 @@ func (s *prsScreen) preview(w int) string {
 	}
 	if loaded {
 		meta += dimStyle.Render("  ·  ") + greenStyle.Render(fmt.Sprintf("+%d", pr.Additions)) + " " +
-			redStyle.Render(fmt.Sprintf("−%d", pr.Deletions)) + dimStyle.Render(fmt.Sprintf("  ·  %d fichiers", pr.ChangedFiles))
+			redStyle.Render(fmt.Sprintf("−%d", pr.Deletions)) + dimStyle.Render("  ·  "+i18n.T("%d files", pr.ChangedFiles))
 	}
 	b.WriteString(meta + "\n" + rule(w, "") + "\n")
-	b.WriteString(purpleStyle.Bold(true).Render("Description") + "\n")
+	b.WriteString(purpleStyle.Bold(true).Render(i18n.T("Description")) + "\n")
 	if strings.TrimSpace(pr.Body) == "" {
-		b.WriteString(dimStyle.Render("(aucune description)") + "\n")
+		b.WriteString(dimStyle.Render(i18n.T("(no description)")) + "\n")
 	} else {
 		b.WriteString(styleBody(pr.Body, w) + "\n")
 	}
 	if !loaded {
-		b.WriteString("\n" + dimStyle.Render("chargement des checks et fichiers…"))
+		b.WriteString("\n" + dimStyle.Render(i18n.T("loading checks and files…")))
 		return b.String()
 	}
 	if len(x.checks) > 0 {
@@ -389,7 +390,7 @@ func (s *prsScreen) preview(w int) string {
 		}
 	}
 	if len(x.files) > 0 {
-		b.WriteString(rule(w, "Fichiers modifiés") + "\n")
+		b.WriteString(rule(w, i18n.T("Changed files")) + "\n")
 		for _, f := range x.files {
 			letter := map[string]string{"added": greenStyle.Render("A"), "removed": redStyle.Render("D"),
 				"renamed": blueStyle.Render("R")}[f.Status]
@@ -406,7 +407,7 @@ func (s *prsScreen) preview(w int) string {
 func (s *prsScreen) Capturing() bool { return s.list.FilterState() == list.Filtering }
 func (s *prsScreen) Keys() []key.Binding {
 	return []key.Binding{
-		key.NewBinding(key.WithKeys("j"), key.WithHelp("j/k", "naviguer")),
+		key.NewBinding(key.WithKeys("j"), key.WithHelp("j/k", i18n.T("navigate"))),
 		keyOpenItem, s.filter, s.scopeKey, keySearch, keySwitch, keyBrowser, keyRefresh,
 	}
 }

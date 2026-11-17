@@ -7,6 +7,8 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/kevin/gitui/internal/i18n"
 )
 
 // fit truncates s to w cells (with an ellipsis) and pads it with spaces.
@@ -43,7 +45,7 @@ func humanCount(n int) string {
 	return fmt.Sprintf("%.1fM", float64(n)/1e6)
 }
 
-// since formats a past time compactly in French: "2 h", "hier", "3 sem".
+// since formats a past time compactly: "2 h", "3 wk".
 func since(t time.Time) string {
 	if t.IsZero() {
 		return ""
@@ -51,28 +53,28 @@ func since(t time.Time) string {
 	d := time.Since(t)
 	switch {
 	case d < time.Minute:
-		return "à l'instant"
+		return i18n.T("just now")
 	case d < time.Hour:
-		return fmt.Sprintf("%d min", int(d.Minutes()))
+		return i18n.T("%d min", int(d.Minutes()))
 	case d < 24*time.Hour:
-		return fmt.Sprintf("%d h", int(d.Hours()))
+		return i18n.T("%d h", int(d.Hours()))
 	case d < 7*24*time.Hour:
-		return fmt.Sprintf("%d j", int(d.Hours()/24))
+		return i18n.T("%d d", int(d.Hours()/24))
 	case d < 30*24*time.Hour:
-		return fmt.Sprintf("%d sem", int(d.Hours()/24/7))
+		return i18n.T("%d wk", int(d.Hours()/24/7))
 	case d < 365*24*time.Hour:
-		return fmt.Sprintf("%d mois", int(d.Hours()/24/30))
+		return i18n.T("%d mo", int(d.Hours()/24/30))
 	}
-	return fmt.Sprintf("%d ans", int(d.Hours()/24/365))
+	return i18n.T("%d y", int(d.Hours()/24/365))
 }
 
-// ilYa is since() in a sentence: "il y a 2 h".
+// ilYa is since() in a sentence: "2 h ago".
 func ilYa(t time.Time) string {
 	s := since(t)
-	if s == "" || s == "à l'instant" {
+	if s == "" || s == i18n.T("just now") {
 		return s
 	}
-	return "il y a " + s
+	return i18n.T("%s ago", s)
 }
 
 // styleBody lightly styles a markdown body for the preview panes: headings

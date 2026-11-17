@@ -10,11 +10,13 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/kevin/gitui/internal/i18n"
 )
 
 var (
-	ErrExpired = errors.New("le code de connexion a expiré")
-	ErrDenied  = errors.New("autorisation refusée")
+	ErrExpired = i18n.Err("the login code has expired")
+	ErrDenied  = i18n.Err("authorization denied")
 )
 
 const (
@@ -73,7 +75,7 @@ func (f Flow) post(ctx context.Context, path string, form url.Values, out any) e
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 500 || resp.StatusCode == http.StatusNotFound {
-		return fmt.Errorf("github a répondu %s", resp.Status)
+		return fmt.Errorf(i18n.T("github replied %s"), resp.Status)
 	}
 	return json.NewDecoder(resp.Body).Decode(out)
 }
@@ -81,7 +83,7 @@ func (f Flow) post(ctx context.Context, path string, form url.Values, out any) e
 // Start requests a device and user code.
 func (f Flow) Start(ctx context.Context) (DeviceCode, error) {
 	if f.ClientID == "" {
-		return DeviceCode{}, errors.New("client_id non configuré")
+		return DeviceCode{}, errors.New(i18n.T("client_id not configured"))
 	}
 	var r struct {
 		DeviceCode
@@ -96,7 +98,7 @@ func (f Flow) Start(ctx context.Context) (DeviceCode, error) {
 		return DeviceCode{}, fmt.Errorf("%s: %s", r.Error, r.ErrorDesc)
 	}
 	if r.DeviceCode.DeviceCode == "" || r.UserCode == "" {
-		return DeviceCode{}, errors.New("réponse GitHub incomplète")
+		return DeviceCode{}, errors.New(i18n.T("incomplete GitHub response"))
 	}
 	if r.Interval <= 0 {
 		r.Interval = 5
@@ -123,7 +125,7 @@ func (f Flow) Check(ctx context.Context, dc DeviceCode) (PollResult, error) {
 	switch r.Error {
 	case "":
 		if r.AccessToken == "" {
-			return PollResult{}, errors.New("réponse GitHub sans token")
+			return PollResult{}, errors.New(i18n.T("GitHub response without a token"))
 		}
 		return PollResult{Token: r.AccessToken}, nil
 	case "authorization_pending":

@@ -12,6 +12,7 @@ import (
 	gh "github.com/google/go-github/v90/github"
 
 	"github.com/kevin/gitui/internal/domain"
+	"github.com/kevin/gitui/internal/i18n"
 )
 
 // maxFileSize is the largest file the code viewer will download and show.
@@ -82,7 +83,7 @@ func (p *Provider) GetFile(ctx context.Context, repo domain.Repo, ref, path stri
 		return domain.FileContent{}, err
 	}
 	if f == nil {
-		return domain.FileContent{}, fmt.Errorf("%s n'est pas un fichier", path)
+		return domain.FileContent{}, fmt.Errorf(i18n.T("%s is not a file"), path)
 	}
 	out := domain.FileContent{Path: f.GetPath(), Size: f.GetSize()}
 	if out.Size > maxFileSize {
@@ -248,7 +249,7 @@ func (p *Provider) ListPullRequestFiles(ctx context.Context, repo domain.Repo, n
 
 func (p *Provider) ListChecks(ctx context.Context, repo domain.Repo, ref string) ([]domain.Check, error) {
 	if ref == "" {
-		return nil, errors.New("référence de commit manquante")
+		return nil, errors.New(i18n.T("missing commit reference"))
 	}
 	res, resp, err := p.client.Checks.ListCheckRunsForRef(ctx, repo.Owner, repo.Name, ref,
 		&gh.ListCheckRunsOptions{ListOptions: gh.ListOptions{PerPage: perPage}})

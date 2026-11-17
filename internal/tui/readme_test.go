@@ -6,22 +6,24 @@ import (
 	"testing"
 )
 
-// The README documents every rebindable action; keep them in sync.
+// The READMEs document every rebindable action; keep them in sync.
 func TestReadmeDocumentsEveryAction(t *testing.T) {
-	b, err := os.ReadFile("../../README.md")
-	if err != nil {
-		t.Fatal(err)
-	}
-	readme := string(b)
-	for _, name := range ActionNames() {
-		if !strings.Contains(readme, "`"+name+"`") {
-			t.Errorf("README.md does not document action %q", name)
+	for _, file := range []string{"README.md", "README.fr.md"} {
+		b, err := os.ReadFile("../../" + file)
+		if err != nil {
+			t.Fatal(err)
 		}
-	}
-	// and the documented default keys match the code for the common ones
-	for _, want := range []string{"`ctrl+s`", "`alt+enter`", "`backspace`"} {
-		if !strings.Contains(readme, want) {
-			t.Errorf("README.md is missing default key %s", want)
+		readme := string(b)
+		for _, name := range ActionNames() {
+			if !strings.Contains(readme, "`"+name+"`") {
+				t.Errorf("%s does not document action %q", file, name)
+			}
+		}
+		// and the documented default keys match the code for the common ones
+		for _, want := range []string{"`ctrl+s`", "`alt+enter`", "`backspace`", "`--lang"} {
+			if !strings.Contains(readme, want) {
+				t.Errorf("%s is missing %s", file, want)
+			}
 		}
 	}
 }

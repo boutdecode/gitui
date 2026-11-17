@@ -6,6 +6,8 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/lipgloss/v2"
+
+	"github.com/kevin/gitui/internal/i18n"
 )
 
 // tab is one entry of the tab bar. Count < 0 means "no counter".
@@ -20,7 +22,7 @@ func headerView(w int, context, user string) string {
 	logo := headerStyle.Render("gitui")
 	right := ""
 	if user != "" {
-		right = greenStyle.Render("● connecté : @" + user)
+		right = greenStyle.Render(i18n.T("● logged in: @%s", user))
 	}
 	avail := w - lipgloss.Width(logo) - lipgloss.Width(right) - 2
 	ctx := lipgloss.NewStyle().MaxWidth(max(avail, 0)).Render(context)

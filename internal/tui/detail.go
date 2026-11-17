@@ -14,6 +14,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/kevin/gitui/internal/domain"
+	"github.com/kevin/gitui/internal/i18n"
 	"github.com/kevin/gitui/internal/provider"
 )
 
@@ -95,7 +96,7 @@ type detailScreen struct {
 
 func newDetailScreen(p provider.Provider, repo domain.Repo, t target) *detailScreen {
 	ta := textarea.New()
-	ta.Placeholder = "Votre commentaire…"
+	ta.Placeholder = i18n.T("Your comment…")
 	ta.ShowLineNumbers = false
 	ta.SetStyles(textarea.DefaultStyles(isDark))
 	vp := viewport.New()
@@ -269,14 +270,14 @@ func (s *detailScreen) updateCompose(msg tea.KeyPressMsg) (screen, tea.Cmd) {
 	case key.Matches(msg, s.sendKey):
 		body := strings.TrimSpace(s.input.Value())
 		if body == "" {
-			return s, info("commentaire vide, rien envoyé")
+			return s, info(i18n.T("empty comment, nothing sent"))
 		}
 		number := s.t.number
 		s.closePrompt()
 		s.input.Reset()
 		return s, s.act(func(ctx context.Context) error {
 			return s.p.AddComment(ctx, s.repo, number, body)
-		}, actionDoneMsg{text: "commentaire ajouté", reload: true})
+		}, actionDoneMsg{text: i18n.T("comment added"), reload: true})
 	}
 	var cmd tea.Cmd
 	s.input, cmd = s.input.Update(msg)
@@ -293,11 +294,11 @@ func (s *detailScreen) updateConfirm(msg tea.KeyPressMsg) (screen, tea.Cmd) {
 		if which == actApprove {
 			return s, s.act(func(ctx context.Context) error {
 				return s.p.ApprovePullRequest(ctx, s.repo, number, "")
-			}, actionDoneMsg{text: "pull request approuvée", reload: true})
+			}, actionDoneMsg{text: i18n.T("pull request approved"), reload: true})
 		}
 		return s, s.act(func(ctx context.Context) error {
 			return s.p.MergePullRequest(ctx, s.repo, number)
-		}, actionDoneMsg{text: "pull request mergée", merged: true})
+		}, actionDoneMsg{text: i18n.T("pull request merged"), merged: true})
 	}
 	return s, nil
 }
@@ -313,9 +314,9 @@ func (s *detailScreen) render() {
 	if s.showDiff {
 		switch {
 		case s.loadingDiff:
-			s.vp.SetContent(s.spinner.View() + " chargement du diff…")
+			s.vp.SetContent(s.spinner.View() + " " + i18n.T("loading the diff…"))
 		case strings.TrimSpace(s.diff) == "":
-			s.vp.SetContent(dimStyle.Render("(diff vide)"))
+			s.vp.SetContent(dimStyle.Render(i18n.T("(empty diff)")))
 		default:
 			s.vp.SetContent(colorizeDiff(s.diff))
 		}
@@ -337,7 +338,7 @@ func (s *detailScreen) conversation() string {
 	}
 	meta := dimStyle.Render("  ") + authorStyle.Render("@"+s.t.author)
 	if s.t.draft {
-		meta += dimStyle.Render(" · brouillon")
+		meta += dimStyle.Render(" · " + i18n.T("draft"))
 	}
 	if s.t.head != "" && s.t.base != "" {
 		meta += dimStyle.Render(fmt.Sprintf(" · %s → %s", s.t.head, s.t.base))
@@ -352,16 +353,16 @@ func (s *detailScreen) conversation() string {
 	}
 	b.WriteString("\n\n")
 	if strings.TrimSpace(s.t.body) == "" {
-		b.WriteString(dimStyle.Render("(pas de description)"))
+		b.WriteString(dimStyle.Render(i18n.T("(no description)")))
 	} else {
 		b.WriteString(s.t.body)
 	}
 	b.WriteString("\n\n")
 	if s.loadingComments {
-		b.WriteString(s.spinner.View() + " chargement des commentaires…")
+		b.WriteString(s.spinner.View() + " " + i18n.T("loading comments…"))
 		return b.String()
 	}
-	b.WriteString(rule(max(s.w, 20), fmt.Sprintf("%d commentaire(s)", len(s.comments))))
+	b.WriteString(rule(max(s.w, 20), i18n.T("%d comment(s)", len(s.comments))))
 	for _, c := range s.comments {
 		b.WriteString("\n\n" + authorStyle.Render(c.Author) + " " +
 			dimStyle.Render(c.CreatedAt.Format("2006-01-02 15:04")) + "\n" + c.Body)
@@ -372,13 +373,13 @@ func (s *detailScreen) conversation() string {
 func (s *detailScreen) footer() string {
 	switch {
 	case s.mode == modeConfirm:
-		what := "Approuver"
+		what := i18n.T("Approve")
 		if s.pending == actMerge {
-			what = fmt.Sprintf("Merger dans %s", s.t.base)
+			what = i18n.T("Merge into %s", s.t.base)
 		}
-		return promptStyle.Render(fmt.Sprintf("%s #%d ? (y/n)", what, s.t.number))
+		return promptStyle.Render(fmt.Sprintf(i18n.T("%s #%d? (%s)"), what, s.t.number, s.yes.Help().Key+"/"+s.no.Help().Key))
 	case s.busy:
-		return dimStyle.Render("envoi en cours…")
+		return dimStyle.Render(i18n.T("sending…"))
 	}
 	return dimStyle.Render(fmt.Sprintf("%3.0f%%", s.vp.ScrollPercent()*100))
 }
@@ -386,7 +387,7 @@ func (s *detailScreen) footer() string {
 func (s *detailScreen) View() string {
 	if s.mode == modeCompose {
 		return lipgloss.JoinVertical(lipgloss.Left, s.vp.View(),
-			promptStyle.Render("Nouveau commentaire"), s.input.View())
+			promptStyle.Render(i18n.T("New comment")), s.input.View())
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, s.vp.View(), s.footer())
 }

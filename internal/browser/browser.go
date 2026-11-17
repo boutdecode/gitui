@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+
+	"github.com/kevin/gitui/internal/i18n"
 )
 
 // Open launches the default browser on url. Only http(s) URLs are accepted so
@@ -24,7 +26,7 @@ func Open(url string) error {
 		cmd = exec.Command("xdg-open", url)
 	}
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("ouverture du navigateur : %w", err)
+		return fmt.Errorf(i18n.T("opening the browser: %w"), err)
 	}
 	go func() { _ = cmd.Wait() }() // reap the child
 	return nil
@@ -32,7 +34,7 @@ func Open(url string) error {
 
 func validate(url string) error {
 	if !strings.HasPrefix(url, "https://") && !strings.HasPrefix(url, "http://") {
-		return fmt.Errorf("URL non supportée : %q", url)
+		return fmt.Errorf(i18n.T("unsupported URL: %q"), url)
 	}
 	return nil
 }

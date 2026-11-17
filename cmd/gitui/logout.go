@@ -9,6 +9,7 @@ import (
 
 	"github.com/kevin/gitui/internal/auth"
 	"github.com/kevin/gitui/internal/config"
+	"github.com/kevin/gitui/internal/i18n"
 )
 
 // tokenStore is where the OAuth session lives: the OS keyring, with a 0600
@@ -27,20 +28,20 @@ func tokenStore() auth.Store {
 func logout(w io.Writer, store auth.TokenStore, cfgPath string) error {
 	tok, getErr := store.Get()
 	if err := store.Delete(); err != nil {
-		return fmt.Errorf("suppression des identifiants impossible : %w", err)
+		return fmt.Errorf(i18n.T("could not delete the credentials: %w"), err)
 	}
 	switch {
 	case tok != "":
-		fmt.Fprintln(w, "Identifiants supprimés (trousseau et fichier). Relancez gitui pour vous reconnecter.")
+		fmt.Fprintln(w, i18n.T("Credentials deleted (keyring and file). Restart gitui to log in again."))
 	case getErr != nil:
 		// Delete succeeded, but we could not tell whether something was there.
-		fmt.Fprintf(w, "Aucun identifiant supprimé : lecture du trousseau impossible (%v).\n", getErr)
+		fmt.Fprintf(w, i18n.T("No credentials deleted: could not read the keyring (%v).")+"\n", getErr)
 	default:
-		fmt.Fprintln(w, "Aucun identifiant stocké : rien à supprimer.")
+		fmt.Fprintln(w, i18n.T("No stored credentials: nothing to delete."))
 	}
 	if src := staticTokenSource(cfgPath); src != "" {
-		fmt.Fprintf(w, "Note : un token est fourni par %s ; gitui continuera de l'utiliser.\n"+
-			"Retirez-le pour changer d'identité.\n", src)
+		fmt.Fprintf(w, i18n.T("Note: a token is provided by %s; gitui will keep using it.")+"\n"+
+			i18n.T("Remove it to change identity.")+"\n", src)
 	}
 	return nil
 }

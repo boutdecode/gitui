@@ -1,175 +1,199 @@
 # gitui
 
-Un client Git en terminal, construit avec la stack [Charm](https://charm.land)
-(Bubble Tea v2, Bubbles, Lip Gloss). Premier provider : **GitHub**.
+**English** · [Français](README.fr.md)
 
-- Dépôts, pull requests et issues, avec filtres (à relire, assignées, les miennes)
-- Détail avec conversation défilante et diff coloré
-- Commenter, approuver, merger, ouvrir dans le navigateur
-- Connexion par token d'accès personnel **ou** OAuth *device flow* (token OAuth
-  stocké dans le trousseau du système)
-- Thème clair/sombre automatique, raccourcis configurables
+A terminal Git client built with the [Charm](https://charm.land) stack
+(Bubble Tea v2, Bubbles, Lip Gloss). First provider: **GitHub**.
+
+- Repositories, pull requests and issues, with filters (to review, assigned, mine)
+- Detail view with a scrollable conversation and a colored diff
+- Comment, approve, merge, open in the browser
+- Login with a personal access token **or** the OAuth *device flow* (the OAuth
+  token is kept in the system keyring)
+- Automatic light/dark theme, configurable shortcuts
+- English and French interface
 
 ## Installation
 
-Il faut Go ≥ 1.26.
+Requires Go ≥ 1.26.
 
 ```sh
-go install github.com/kevin/gitui/cmd/gitui@latest   # adaptez le chemin du module
-# ou, depuis un clone :
-make build        # produit ./gitui à la racine
+go install github.com/kevin/gitui/cmd/gitui@latest   # adjust the module path
+# or, from a clone:
+make build        # produces ./gitui at the root
 ```
 
-## Authentification
+## Authentication
 
-Deux modes, du plus prioritaire au moins prioritaire :
+Two modes, from highest to lowest priority:
 
-1. **Token d'accès personnel (PAT)** : variable `GITUI_TOKEN`, sinon
-   `GITHUB_TOKEN`, sinon `token:` dans `config.yaml`. Aucune OAuth App n'est
-   nécessaire. Le token est vérifié au démarrage ; il n'est **jamais** écrit dans
-   le trousseau ni sur disque par gitui. S'il est refusé, gitui l'indique (avec sa
-   source) au lieu de basculer sur OAuth ; corrigez-le puis relancez, ou `r`
-   revérifie.
-2. **OAuth device flow** : session stockée, ou nouvelle connexion (ci-dessous).
+1. **Personal access token (PAT)**: the `GITUI_TOKEN` variable, else
+   `GITHUB_TOKEN`, else `token:` in `config.yaml`. No OAuth App is needed. The
+   token is checked at startup; gitui **never** writes it to the keyring or to
+   disk. If it is rejected, gitui says so (with its source) instead of falling
+   back to OAuth; fix it and restart, or press `r` to check again.
+2. **OAuth device flow**: a stored session, or a new login (below).
 
-Pour un PAT classique, cochez les scopes `repo` et `read:org`. Pour un token
-fine-grained, donnez (à titre indicatif) un accès en lecture/écriture aux
-*Pull requests*, *Issues* et
-*Contents* des dépôts voulus.
+For a classic PAT, tick the `repo` and `read:org` scopes. For a fine-grained
+token, give (as a guideline) read/write access to *Pull requests*, *Issues* and
+*Contents* of the repositories you want.
 
-> ⚠️ Un `token:` dans `config.yaml` est stocké **en clair**. Préférez
-> `GITUI_TOKEN` ; sinon gardez le fichier en mode 0600 (gitui avertit sinon).
-> `GITHUB_TOKEN` est aussi lu car c'est la variable standard, mais elle sert
-> alors à gitui : retirez-la de l'environnement si vous ne le souhaitez pas.
+> ⚠️ A `token:` in `config.yaml` is stored **in clear text**. Prefer
+> `GITUI_TOKEN`; otherwise keep the file at mode 0600 (gitui warns you if not).
+> `GITHUB_TOKEN` is also read because it is the standard variable, but gitui
+> will then use it: remove it from the environment if you do not want that.
 
-Avec un token fourni ainsi, `L` (déconnexion) est indisponible : il n'y a rien à
-supprimer, retirez la variable ou la ligne `token:`.
+With a token provided this way, `L` (log out) is unavailable: there is nothing
+to delete, remove the variable or the `token:` line instead.
 
-### Réinitialiser l'authentification
+### Resetting authentication
 
 ```sh
 gitui --logout
 ```
 
-Supprime la session OAuth stockée (trousseau **et** fichier de repli) puis quitte,
-sans ouvrir l'interface ni créer de config. Cela fonctionne même si `config.yaml`
-est cassé. Un token donné par `GITUI_TOKEN`, `GITHUB_TOKEN` ou `token:` n'est pas
-touché : la commande vous signale d'où il vient, car gitui continuera de l'utiliser
-tant que vous ne l'aurez pas retiré. Le token n'est jamais affiché.
+Deletes the stored OAuth session (keyring **and** fallback file) and quits,
+without opening the UI or creating a config. It works even if `config.yaml` is
+broken. A token given by `GITUI_TOKEN`, `GITHUB_TOKEN` or `token:` is left
+alone: the command tells you where it comes from, since gitui keeps using it
+until you remove it. The token is never printed.
 
 ### OAuth device flow
 
-1. Créez une **OAuth App** GitHub (*Settings → Developer settings → OAuth Apps*)
-   et cochez **Enable Device Flow**. Aucun secret n'est nécessaire : le client ID
-   est public.
-2. Renseignez son client ID, au choix :
-   - variable d'environnement `GITUI_CLIENT_ID`
-   - `client_id: …` dans le fichier de configuration (ci-dessous)
-3. Lancez `gitui`, ouvrez l'URL affichée et saisissez le code (`c` le copie).
+1. Create a GitHub **OAuth App** (*Settings → Developer settings → OAuth Apps*)
+   and tick **Enable Device Flow**. No secret is needed: the client ID is public.
+2. Provide its client ID, either:
+   - the `GITUI_CLIENT_ID` environment variable
+   - `client_id: …` in the configuration file (below)
+3. Run `gitui`, open the displayed URL and enter the code (`c` copies it).
 
-Pour essayer l'interface sans compte : `gitui --fake`.
+To try the interface without an account: `gitui --fake`.
 
-L'interface peint le fond du thème (violet très sombre, ou clair). `gitui --transparent` garde à la place le fond de votre terminal.
+The interface paints the theme background (very dark purple, or light).
+`gitui --transparent` keeps your terminal's background instead.
 
-Le token OAuth est gardé dans le trousseau du système. Sans trousseau (Linux sans
-session graphique), il est écrit dans `~/.config/gitui/token` en mode 0600.
-`L` déconnecte et supprime ce token.
+The OAuth token is kept in the system keyring. Without a keyring (Linux without
+a graphical session) it is written to `~/.config/gitui/token` with mode 0600.
+`L` logs out and deletes this token.
 
 ## Configuration
 
-`~/.config/gitui/config.yaml` (le dossier suit `os.UserConfigDir()`). Il est créé
-automatiquement au premier lancement, avec les valeurs par défaut commentées ;
-un fichier existant n'est jamais modifié. Exemple :
+`~/.config/gitui/config.yaml` (the directory follows `os.UserConfigDir()`). It
+is created automatically on first launch, with commented default values; an
+existing file is never modified. Example:
 
 ```yaml
-client_id: Iv1.xxxxxxxxxxxx   # OAuth uniquement
-# token: ghp_…                # PAT, en clair : préférez GITUI_TOKEN
-scopes: [repo, read:org]   # défaut
+client_id: Iv1.xxxxxxxxxxxx   # OAuth only
+# token: ghp_…                # PAT, in clear text: prefer GITUI_TOKEN
+scopes: [repo, read:org]   # default
 theme: auto                # auto | light | dark
+lang: auto                 # auto (from the system) | en | fr
 
 keys:
   merge: [M]
   quit: [q, x]
 ```
 
-`GITUI_CLIENT_ID` l'emporte sur `client_id`. Une clé inconnue (faute de frappe
-comprise) est refusée au démarrage. `theme = "auto"` suit la couleur de
-fond du terminal.
+`GITUI_CLIENT_ID` takes precedence over `client_id`. An unknown key (typos
+included) is rejected at startup. `theme: auto` follows the terminal's
+background color.
 
-## Écrans
+## Language
 
-- **Dépôts** : onglets Mes dépôts / Favoris / Organisations / Récents, tableau à gauche, détail à droite. `enter` ouvre un dépôt.
-- **Code** (`1`) : arbre de fichiers repliable et visionneuse avec coloration syntaxique.
-- **Pull requests** (`2`) et **Issues** (`3`) : liste à gauche, aperçu à droite (checks CI, fichiers modifiés, commentaires). `enter` ouvre le détail plein écran (diff, commentaires, approbation, merge).
+The interface is available in English (the default) and French. The language
+is chosen, in order of priority:
 
-En dessous de 90 colonnes, les aperçus sont masqués et seule la liste est affichée.
+1. the `--lang en|fr` option (e.g. `gitui --lang fr`);
+2. `lang:` in `config.yaml` (`auto`, `en` or `fr`);
+3. the system language: the `LC_ALL`, `LC_MESSAGES`, `LANGUAGE` and `LANG`
+   variables;
+4. otherwise English.
 
-Les dépôts ouverts récemment sont mémorisés dans `recent.json`, à côté du fichier de configuration.
+The language of the config file created on first launch follows the same
+rules. Any unsupported system language falls back to English.
 
-## Raccourcis
+## Screens
 
-Toutes les actions ci-dessous sont reconfigurables dans `[keys]`. Un nom inconnu,
-une liste vide ou une touche utilisée deux fois sur un même écran fait échouer le
-démarrage avec un message explicite. `ctrl+c` quitte toujours, quoi qu'on
-configure. Les touches des composants (déplacement dans les listes, défilement,
-édition de texte) ne sont pas configurables.
+- **Repositories**: My repos / Favorites / Organizations / Recent tabs, table on the left, detail on the right. `enter` opens a repository.
+- **Code** (`1`): collapsible file tree and viewer with syntax highlighting.
+- **Pull requests** (`2`) and **Issues** (`3`): list on the left, preview on the right (CI checks, changed files, comments). `enter` opens the full-screen detail (diff, comments, approval, merge).
 
-| Action    | Défaut            | Où                              |
+Below 90 columns the previews are hidden and only the list is shown.
+
+Recently opened repositories are remembered in `recent.json`, next to the configuration file.
+
+## Shortcuts
+
+Every action below can be rebound under `keys`. An unknown name, an empty list
+or a key used twice on the same screen makes startup fail with an explicit
+message. `ctrl+c` always quits, whatever you configure. Widget keys (moving in
+lists, scrolling, text editing) are not configurable.
+
+| Action    | Default           | Where                           |
 |-----------|-------------------|---------------------------------|
-| `quit`    | `q`, `ctrl+c`     | partout                         |
-| `help`    | `?`               | partout                         |
-| `back`    | `esc`, `backspace`| partout                         |
-| `logout`  | `L`               | une fois connecté               |
-| `open`    | `enter`           | listes                          |
-| `switch`  | `tab`             | onglet suivant (`1`-`4` : accès direct) |
-| `switchback` | `shift+tab`    | onglet précédent                |
-| `browser` | `o`               | listes et détail                |
-| `search`  | `/`               | listes                          |
-| `filter`  | `f`               | dépôts (visibilité), PR et issues (état) |
-| `scope`   | `p`               | liste des PR (tous / à relire / assignées / les miennes) |
-| `star`    | `s`               | dépôts : ajouter/retirer des favoris |
-| `sort`    | `t`               | dépôts : activité / nom / étoiles |
-| `refresh` | `r`               | recharger la liste courante     |
-| `branch`  | `b`               | code : branche suivante         |
-| `parent`  | `h`               | code : dossier parent / replier |
-| `comment` | `c`               | détail                          |
-| `approve` | `a`               | détail d'une PR ouverte         |
-| `merge`   | `m`               | détail d'une PR ouverte         |
-| `diff`    | `tab`             | détail d'une PR                 |
-| `send`    | `ctrl+s`, `alt+enter` | éditeur de commentaire      |
-| `cancel`  | `esc`             | éditeur de commentaire          |
+| `quit`    | `q`, `ctrl+c`     | everywhere                      |
+| `help`    | `?`               | everywhere                      |
+| `back`    | `esc`, `backspace`| everywhere                      |
+| `logout`  | `L`               | once logged in                  |
+| `open`    | `enter`           | lists                           |
+| `switch`  | `tab`             | next tab (`1`-`4`: direct access) |
+| `switchback` | `shift+tab`    | previous tab                    |
+| `browser` | `o`               | lists and detail                |
+| `search`  | `/`               | lists                           |
+| `filter`  | `f`               | repositories (visibility), PRs and issues (state) |
+| `scope`   | `p`               | PR list (all / to review / assigned / mine) |
+| `star`    | `s`               | repositories: add/remove favorites |
+| `sort`    | `t`               | repositories: activity / name / stars |
+| `refresh` | `r`               | reload the current list         |
+| `branch`  | `b`               | code: next branch               |
+| `parent`  | `h`               | code: parent directory / collapse |
+| `comment` | `c`               | detail                          |
+| `approve` | `a`               | detail of an open PR            |
+| `merge`   | `m`               | detail of an open PR            |
+| `diff`    | `tab`             | PR detail                       |
+| `send`    | `ctrl+s`, `alt+enter` | comment editor              |
+| `cancel`  | `esc`             | comment editor                  |
 | `yes`     | `y`               | confirmation                    |
 | `no`      | `n`, `esc`        | confirmation                    |
-| `copy`    | `c`               | écran de connexion              |
-| `retry`   | `r`               | écran de connexion              |
+| `copy`    | `c`               | login screen                    |
+| `retry`   | `r`               | login screen                    |
 
-## Limites connues
+## Known limitations
 
-- Les descriptions et commentaires sont affichés avec un style minimal (titres, puces), sans rendu markdown complet.
-- Les fichiers de plus de 1 Mo et les fichiers binaires ne sont pas affichés dans l'onglet Code.
-- Seuls les commentaires de conversation sont listés, pas ceux attachés au diff.
-- L'approbation n'envoie pas de message ; le merge utilise la méthode par défaut.
-- Les listes sont plafonnées à 1000 éléments (10 pages de 100).
+- Descriptions and comments are shown with minimal styling (headings, bullets), without full markdown rendering.
+- Files larger than 1 MB and binary files are not displayed in the Code tab.
+- Only conversation comments are listed, not those attached to the diff.
+- Approving does not send a message; merging uses the default method.
+- Lists are capped at 1000 items (10 pages of 100).
 
 ## Architecture
 
 ```
-cmd/gitui            point d'entrée
-internal/domain      types neutres (Repo, PullRequest, Issue, …)
-internal/provider    interface Provider ; github/ (réel) et fake/ (hors ligne)
-internal/auth        device flow + stockage du token
-internal/config      lecture de config.yaml
-internal/browser     ouverture d'URL
-internal/tui         modèles Bubble Tea (une pile d'écrans)
+cmd/gitui            entry point
+internal/domain      neutral types (Repo, PullRequest, Issue, …)
+internal/provider    Provider interface; github/ (real) and fake/ (offline)
+internal/auth        device flow + token storage
+internal/config      config.yaml loading
+internal/i18n        translations (English source strings, French catalog)
+internal/browser     URL opening
+internal/tui         Bubble Tea models (a stack of screens)
 ```
 
-L'interface ne dépend que de `internal/provider` : ajouter GitLab revient à
-implémenter `Provider`. Les appels réseau passent uniquement par des `tea.Cmd`.
+The UI only depends on `internal/provider`: adding GitLab means implementing
+`Provider`. Network calls only go through `tea.Cmd`s.
 
-## Développement
+### Translations
+
+User-visible strings are written in English in the source and passed through
+`i18n.T("…")`; the English text is the lookup key. The French translations live
+in `internal/i18n/fr.go`. A test fails when a string passed to `T` has no
+French entry. To add a language, add a catalog next to `fr.go` and register
+its code in `i18n.Langs` / `i18n.Parse`.
+
+## Development
 
 ```sh
 make test      # go test ./...
 make vet       # go vet ./...
-make run-fake  # interface avec données factices
+make run-fake  # interface with fake data
 ```

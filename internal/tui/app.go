@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/kevin/gitui/internal/i18n"
 	"github.com/kevin/gitui/internal/provider"
 	"github.com/kevin/gitui/internal/recents"
 )
@@ -316,12 +317,12 @@ func (m Model) View() tea.View {
 		status = infoStyle.Render("✓ " + m.info)
 	}
 	if m.err != nil {
-		status = errorStyle.Render("erreur : " + m.err.Error())
+		status = errorStyle.Render(i18n.T("error: ") + m.err.Error())
 		if errors.Is(m.err, provider.ErrUnauthorized) && m.auth != nil {
 			if m.canLogout() {
-				status += statusStyle.Render("  (L pour vous reconnecter)")
+				status += statusStyle.Render("  (" + i18n.T("%s to log in again", keys.Logout.Help().Key) + ")")
 			} else {
-				status += statusStyle.Render("  (vérifiez le token : " + m.auth.StaticSource + ")")
+				status += statusStyle.Render("  (" + i18n.T("check the token: %s", m.auth.StaticSource) + ")")
 			}
 		}
 	}

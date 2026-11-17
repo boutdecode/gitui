@@ -11,6 +11,7 @@ import (
 	gh "github.com/google/go-github/v90/github"
 
 	"github.com/kevin/gitui/internal/domain"
+	"github.com/kevin/gitui/internal/i18n"
 	"github.com/kevin/gitui/internal/provider"
 )
 
@@ -82,9 +83,9 @@ func mapErr(resp *gh.Response, err error) error {
 	var abuse *gh.AbuseRateLimitError
 	switch {
 	case errors.As(err, &rl):
-		return fmt.Errorf("limite d'API atteinte, réessayez après %s", rl.Rate.Reset.Format("15:04"))
+		return fmt.Errorf(i18n.T("API rate limit reached, retry after %s"), rl.Rate.Reset.Format("15:04"))
 	case errors.As(err, &abuse):
-		return errors.New("GitHub demande de ralentir (limite secondaire), réessayez dans un instant")
+		return errors.New(i18n.T("GitHub asks to slow down (secondary rate limit), retry in a moment"))
 	case resp != nil && resp.StatusCode == http.StatusUnauthorized:
 		return provider.ErrUnauthorized
 	}
@@ -329,7 +330,7 @@ func (p *Provider) MergePullRequest(ctx context.Context, repo domain.Repo, numbe
 		return err
 	}
 	if !res.GetMerged() {
-		return fmt.Errorf("merge refusé : %s", res.GetMessage())
+		return fmt.Errorf(i18n.T("merge refused: %s"), res.GetMessage())
 	}
 	return nil
 }

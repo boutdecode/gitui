@@ -8,6 +8,8 @@ import (
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+
+	"github.com/kevin/gitui/internal/i18n"
 )
 
 // rowItem is a list item that draws itself. Row returns exactly the lines the
@@ -90,11 +92,11 @@ func box(content string, width int, active bool) string {
 
 // pill is a bordered "label : value" filter indicator.
 func pill(label, value string) string {
-	return box(dimStyle.Render(label+" : ")+value, 0, false)
+	return box(dimStyle.Render(i18n.T("%s: ", label))+value, 0, false)
 }
 
 // toolbar renders the search box (taking the remaining width) followed by the
-// filter pills, e.g. "/ Filtrer…   [statut : ouvertes]".
+// filter pills, e.g. "/ Filter…   [state: open]".
 func toolbar(w int, l list.Model, placeholder string, pills ...string) string {
 	pillsW := 0
 	for _, p := range pills {

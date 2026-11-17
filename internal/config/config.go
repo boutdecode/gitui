@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"go.yaml.in/yaml/v3"
+
+	"github.com/kevin/gitui/internal/i18n"
 )
 
 const (
@@ -33,6 +35,8 @@ type Config struct {
 	Scopes []string `yaml:"scopes"`
 	// Theme is "auto" (default, follows the terminal), "light" or "dark".
 	Theme string `yaml:"theme"`
+	// Lang is the UI language: "auto" (default, from the system), "en" or "fr".
+	Lang string `yaml:"lang"`
 	// Token is a personal access token. When set (here or via the
 	// environment) it replaces the OAuth login entirely.
 	Token string `yaml:"token"`
@@ -45,7 +49,7 @@ type Config struct {
 }
 
 func defaults() Config {
-	return Config{Scopes: []string{"repo", "read:org"}, Theme: "auto"}
+	return Config{Scopes: []string{"repo", "read:org"}, Theme: "auto", Lang: "auto"}
 }
 
 // Dir returns the directory holding gitui's config and fallback token file.
@@ -68,7 +72,36 @@ func Path() string {
 
 // template is written on first launch. Every active line equals the built-in
 // default, so creating the file never changes behavior.
-const template = `# Configuration de gitui.
+const templateEN = `# gitui configuration.
+
+# Client ID of a GitHub OAuth App with "Enable Device Flow" turned on
+# (Settings > Developer settings > OAuth Apps). It is public.
+# Can also be given through the GITUI_CLIENT_ID environment variable.
+# client_id: Iv1.xxxxxxxxxxxx
+
+# GitHub Personal Access Token: replaces the OAuth login (no client_id needed).
+# WARNING: stored in clear text on disk. Prefer the GITUI_TOKEN environment
+# variable (it takes precedence over this value). Keep this file at mode 0600.
+# token: ghp_xxxxxxxxxxxxxxxxxxxx
+
+# Permissions requested at login.
+scopes: [repo, read:org]
+
+# auto (follows the terminal background) | light | dark
+theme: auto
+
+# Interface language: auto (from the system) | en | fr
+# The --lang flag takes precedence over this value.
+lang: auto
+
+# Custom shortcuts: action -> list of keys.
+# Actions: see the README. ctrl+c always quits.
+# keys:
+#   merge: [M]
+#   quit: [q, x]
+`
+
+const templateFR = `# Configuration de gitui.
 
 # Client ID d'une OAuth App GitHub avec "Enable Device Flow" activé
 # (Settings > Developer settings > OAuth Apps). Il est public.
@@ -86,6 +119,10 @@ scopes: [repo, read:org]
 # auto (suit le fond du terminal) | light | dark
 theme: auto
 
+# Langue de l'interface : auto (selon le système) | en | fr
+# L'option --lang l'emporte sur cette valeur.
+lang: auto
+
 # Raccourcis personnalisés : action -> liste de touches.
 # Actions : voir le README. ctrl+c quitte toujours.
 # keys:
@@ -93,11 +130,18 @@ theme: auto
 #   quit: [q, x]
 `
 
+func template() string {
+	if i18n.Current() == i18n.FR {
+		return templateFR
+	}
+	return templateEN
+}
+
 // EnsureFile creates a commented default config at path if none exists. It
 // never overwrites an existing file; created reports whether it wrote one.
 func EnsureFile(path string) (created bool, err error) {
 	if path == "" {
-		return false, errors.New("chemin de configuration introuvable")
+		return false, errors.New(i18n.T("configuration path not found"))
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return false, err
@@ -110,7 +154,7 @@ func EnsureFile(path string) (created bool, err error) {
 	if err != nil {
 		return false, err
 	}
-	if _, err := f.WriteString(template); err != nil {
+	if _, err := f.WriteString(template()); err != nil {
 		f.Close()
 		return false, err
 	}
@@ -142,7 +186,7 @@ func Load(path string) (Config, error) {
 	c := defaults()
 	if path != "" {
 		if err := decodeFile(path, &c); err != nil {
-			return c, fmt.Errorf("lecture de %s : %w", path, err)
+			return c, fmt.Errorf(i18n.T("reading %s: %w"), path, err)
 		}
 	}
 	if v := os.Getenv(EnvClientID); v != "" {
@@ -163,10 +207,13 @@ func Load(path string) (Config, error) {
 	if len(c.Scopes) == 0 {
 		c.Scopes = defaults().Scopes
 	}
+	if !i18n.ValidConfig(c.Lang) {
+		return c, fmt.Errorf(i18n.T("invalid lang %q in %s (expected: auto, en or fr)"), c.Lang, path)
+	}
 	switch c.Theme {
 	case "auto", "light", "dark":
 	default:
-		return c, fmt.Errorf("theme %q invalide dans %s (attendu : auto, light ou dark)", c.Theme, path)
+		return c, fmt.Errorf(i18n.T("invalid theme %q in %s (expected: auto, light or dark)"), c.Theme, path)
 	}
 	return c, nil
 }

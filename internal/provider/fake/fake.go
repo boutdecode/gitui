@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/kevin/gitui/internal/domain"
+	"github.com/kevin/gitui/internal/i18n"
 )
 
 type Provider struct {
@@ -207,7 +208,7 @@ func (*Provider) ListTree(_ context.Context, _ domain.Repo, _, dir string) ([]do
 		}
 	}
 	if len(seen) == 0 && dir != "" {
-		return nil, fmt.Errorf("%s : dossier introuvable", dir)
+		return nil, fmt.Errorf(i18n.T("%s: directory not found"), dir)
 	}
 	out := make([]domain.TreeEntry, 0, len(seen))
 	for _, e := range seen {
@@ -220,7 +221,7 @@ func (*Provider) ListTree(_ context.Context, _ domain.Repo, _, dir string) ([]do
 func (*Provider) GetFile(_ context.Context, _ domain.Repo, _, p string) (domain.FileContent, error) {
 	c, ok := files[path.Clean(p)]
 	if !ok {
-		return domain.FileContent{}, fmt.Errorf("%s : fichier introuvable", p)
+		return domain.FileContent{}, fmt.Errorf(i18n.T("%s: file not found"), p)
 	}
 	f := domain.FileContent{Path: p, Size: len(c), CommitSHA: "a3f9c21", CommitTime: ago(3 * day)}
 	if strings.ContainsRune(c, 0) {

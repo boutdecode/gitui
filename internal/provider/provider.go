@@ -3,9 +3,9 @@ package provider
 
 import (
 	"context"
-	"errors"
 
 	"github.com/kevin/gitui/internal/domain"
+	"github.com/kevin/gitui/internal/i18n"
 )
 
 type Provider interface {
@@ -40,7 +40,7 @@ type Provider interface {
 }
 
 // ErrUnauthorized means the token is missing, expired or revoked.
-var ErrUnauthorized = errors.New("session expirée ou token révoqué")
+var ErrUnauthorized = i18n.Err("session expired or token revoked")
 
 // RateLimiter is implemented by providers that can report their API quota.
 type RateLimiter interface {

@@ -14,6 +14,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/kevin/gitui/internal/domain"
+	"github.com/kevin/gitui/internal/i18n"
 	"github.com/kevin/gitui/internal/provider"
 	"github.com/kevin/gitui/internal/recents"
 )
@@ -27,11 +28,11 @@ const (
 	repoTabCount
 )
 
-var repoTabLabels = [repoTabCount]string{"Mes dépôts", "Favoris", "Organisations", "Récents"}
+var repoTabLabels = [repoTabCount]string{"My repos", "Favorites", "Organizations", "Recent"}
 
-var repoFilters = []string{"tous", "publics", "privés", "forks", "archivés"}
+var repoFilters = []string{"all", "public", "private", "forks", "archived"}
 
-var repoSorts = []string{"activité", "nom", "étoiles"}
+var repoSorts = []string{"activity", "name", "stars"}
 
 func repoMatches(r domain.Repo, filter int) bool {
 	switch filter {
@@ -64,13 +65,13 @@ func (i repoItem) Row(w int, sel bool) string {
 	r := i.r
 	name := r.FullName()
 	if r.Private {
-		name += " [privé]"
+		name += " [" + i18n.T("private") + "]"
 	}
 	if r.Fork {
 		name += " [fork]"
 	}
 	if r.Archived {
-		name += " [archivé]"
+		name += " [" + i18n.T("archived") + "]"
 	}
 	if r.Starred {
 		name += " ♥"
@@ -87,11 +88,11 @@ func (i repoItem) Row(w int, sel bool) string {
 }
 
 func repoHeader(w int) string {
-	return dimStyle.Render("  " + fit("NOM", repoNameWidth(w)) + " " + fit("LANG", colLang) + " " +
-		fitRight("★", colStars) + " " + fitRight("MAJ", colWhen))
+	return dimStyle.Render("  " + fit(i18n.T("NAME"), repoNameWidth(w)) + " " + fit(i18n.T("LANG"), colLang) + " " +
+		fitRight("★", colStars) + " " + fitRight(i18n.T("UPD"), colWhen))
 }
 
-// orgItem is one organization in the Organisations tab.
+// orgItem is one organization in the Organizations tab.
 type orgItem struct{ o domain.Org }
 
 func (i orgItem) FilterValue() string { return i.o.Login + " " + i.o.Description }
@@ -163,7 +164,7 @@ func newReposScreen(p provider.Provider, rec *recents.Store) *reposScreen {
 	}
 }
 
-func (s *reposScreen) Title() string { return "Dépôts" }
+func (s *reposScreen) Title() string { return i18n.T("Repositories") }
 
 func (s *reposScreen) Header() string {
 	name := s.p.Name()
@@ -171,15 +172,15 @@ func (s *reposScreen) Header() string {
 		name = "GitHub"
 	}
 	if s.org != "" {
-		return name + dimStyle.Render(" · Organisations › ") + purpleStyle.Render(s.org)
+		return name + dimStyle.Render(" · "+i18n.T("Organizations")+" › ") + purpleStyle.Render(s.org)
 	}
-	return name + dimStyle.Render(" · Dépôts")
+	return name + dimStyle.Render(" · "+i18n.T("Repositories"))
 }
 
 func (s *reposScreen) Tabs() ([]tab, int) {
 	tabs := make([]tab, repoTabCount)
 	for i := range tabs {
-		tabs[i] = tab{Label: repoTabLabels[i], Count: -1}
+		tabs[i] = tab{Label: i18n.T(repoTabLabels[i]), Count: -1}
 		switch {
 		case i == repoTabOrgs && s.loaded[i]:
 			tabs[i].Count = len(s.orgs)
@@ -199,7 +200,7 @@ func (s *reposScreen) SwitchTab(i int) tea.Cmd {
 
 func (s *reposScreen) Init() tea.Cmd { return s.load(s.tab) }
 
-// load fetches a tab's repositories (Récents is local and always re-read).
+// load fetches a tab's repositories (Recent is local and always re-read).
 func (s *reposScreen) load(tab int) tea.Cmd {
 	if tab == repoTabRecent {
 		if s.recents != nil {
@@ -394,9 +395,9 @@ func (s *reposScreen) update(msg tea.Msg) tea.Cmd {
 	case starDoneMsg:
 		s.applyStar(msg.repo, msg.on)
 		if msg.on {
-			return info("ajouté aux favoris : " + msg.repo.FullName())
+			return info(i18n.T("added to favorites: %s", msg.repo.FullName()))
 		}
-		return info("retiré des favoris : " + msg.repo.FullName())
+		return info(i18n.T("removed from favorites: %s", msg.repo.FullName()))
 	case spinner.TickMsg:
 		if !s.anyLoading() {
 			return nil
@@ -440,7 +441,7 @@ func (s *reposScreen) handleKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 	case key.Matches(msg, s.sortKey):
 		s.sortBy = (s.sortBy + 1) % len(repoSorts)
 		s.rebuild()
-		return info("tri : " + repoSorts[s.sortBy]), true
+		return info(i18n.T("sort: %s", i18n.T(repoSorts[s.sortBy]))), true
 	case key.Matches(msg, keyRefresh):
 		s.loaded[s.tab] = false
 		s.counts = map[string][2]int{}
@@ -468,7 +469,7 @@ func (s *reposScreen) handleKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 	return nil, false
 }
 
-// handleOrgKey drives the Organisations tab: enter opens an organization,
+// handleOrgKey drives the Organizations tab: enter opens an organization,
 // back returns to the list.
 func (s *reposScreen) handleOrgKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 	switch {
@@ -569,10 +570,10 @@ func (s *reposScreen) leftWidth() (int, int) {
 func (s *reposScreen) View() string {
 	var bar string
 	if s.inOrgList() {
-		bar = toolbar(s.w, s.list, "Rechercher une organisation…")
+		bar = toolbar(s.w, s.list, i18n.T("Search an organization…"))
 	} else {
-		bar = toolbar(s.w, s.list, "Rechercher un dépôt…",
-			pill("visibilité", repoFilters[s.filter]), pill("tri", repoSorts[s.sortBy]))
+		bar = toolbar(s.w, s.list, i18n.T("Search a repository…"),
+			pill(i18n.T("visibility"), i18n.T(repoFilters[s.filter])), pill(i18n.T("sort"), i18n.T(repoSorts[s.sortBy])))
 	}
 	lw, rw := s.leftWidth()
 	ph := max(s.h-toolbarHeight, 3)
@@ -580,15 +581,15 @@ func (s *reposScreen) View() string {
 	var table string
 	switch {
 	case s.loading[s.tab] && !s.loaded[s.tab]:
-		table = s.spinner.View() + " chargement…"
+		table = s.spinner.View() + " " + i18n.T("loading…")
 	case s.loadingOrg && len(s.list.Items()) == 0:
-		table = s.spinner.View() + " chargement des dépôts de " + s.org + "…"
+		table = s.spinner.View() + " " + i18n.T("loading repositories of %s…", s.org)
 	case len(s.list.Items()) == 0:
 		table = dimStyle.Render(s.emptyText())
 	default:
 		hdr := repoHeader(lw - 4)
 		if s.inOrgList() {
-			hdr = dimStyle.Render("  ORGANISATION")
+			hdr = dimStyle.Render("  " + i18n.T("ORGANIZATION"))
 		}
 		table = hdr + "\n" + s.list.View()
 	}
@@ -601,15 +602,15 @@ func (s *reposScreen) View() string {
 
 func (s *reposScreen) emptyText() string {
 	if s.tab == repoTabRecent {
-		return "Aucun dépôt ouvert récemment."
+		return i18n.T("No recently opened repository.")
 	}
 	if s.inOrgList() {
-		return "Aucune organisation."
+		return i18n.T("No organization.")
 	}
 	if s.loaded[s.tab] && len(s.data[s.tab]) > 0 {
-		return "Aucun dépôt ne correspond au filtre."
+		return i18n.T("No repository matches the filter.")
 	}
-	return "Aucun dépôt."
+	return i18n.T("No repository.")
 }
 
 // detail is the right-hand summary of the selected repository.
@@ -626,36 +627,36 @@ func (s *reposScreen) detail(w int) string {
 	b.WriteString(pinkStyle.Bold(true).Render(r.FullName()) + "\n")
 	b.WriteString(dimStyle.Render(fit(r.Description, w)) + "\n")
 	b.WriteString(rule(w, "") + "\n")
-	vis := "public"
+	vis := i18n.T("public")
 	if r.Private {
-		vis = "privé"
+		vis = i18n.T("private")
 	}
-	b.WriteString(val("Visibilité", vis))
+	b.WriteString(val(i18n.T("Visibility"), vis))
 	if r.DefaultBranch != "" {
-		b.WriteString(val("Branche", purpleStyle.Render(r.DefaultBranch)))
+		b.WriteString(val(i18n.T("Branch"), purpleStyle.Render(r.DefaultBranch)))
 	}
 	if r.License != "" {
-		b.WriteString(val("Licence", r.License))
+		b.WriteString(val(i18n.T("License"), r.License))
 	}
 	if r.Language != "" {
-		b.WriteString(val("Langage", blueStyle.Render(r.Language)))
+		b.WriteString(val(i18n.T("Language"), blueStyle.Render(r.Language)))
 	}
-	b.WriteString(val("Étoiles", yellowStyle.Render("★")+" "+fmt.Sprint(r.Stars)))
-	b.WriteString(val("Forks", fmt.Sprint(r.Forks)))
+	b.WriteString(val(i18n.T("Stars"), yellowStyle.Render("★")+" "+fmt.Sprint(r.Stars)))
+	b.WriteString(val(i18n.T("Forks"), fmt.Sprint(r.Forks)))
 	if len(r.Topics) > 0 {
 		b.WriteString(val("Topics", blueStyle.Render(strings.Join(r.Topics, "  "))))
 	}
-	b.WriteString(rule(w, "Activité") + "\n")
+	b.WriteString(rule(w, i18n.T("Activity")) + "\n")
 	if c, ok := s.counts[r.FullName()]; ok {
-		b.WriteString(greenStyle.Render("●") + fmt.Sprintf(" %d pull requests ouvertes\n", c[0]))
-		b.WriteString(greenStyle.Render("●") + fmt.Sprintf(" %d issues ouvertes\n", c[1]))
+		b.WriteString(greenStyle.Render("●") + " " + i18n.T("%d open pull requests", c[0]) + "\n")
+		b.WriteString(greenStyle.Render("●") + " " + i18n.T("%d open issues", c[1]) + "\n")
 	} else {
 		b.WriteString(dimStyle.Render("…\n"))
 	}
 	if !r.UpdatedAt.IsZero() {
-		b.WriteString(dimStyle.Render("Dernier push  " + ilYa(r.UpdatedAt)))
+		b.WriteString(dimStyle.Render(i18n.T("Last push") + "  " + ilYa(r.UpdatedAt)))
 	}
-	b.WriteString("\n\n" + keyCapStyle.Render(s.open.Help().Key) + dimStyle.Render(" ouvrir le dépôt"))
+	b.WriteString("\n\n" + keyCapStyle.Render(s.open.Help().Key) + dimStyle.Render(" "+i18n.T("open the repository")))
 	return b.String()
 }
 
@@ -671,9 +672,9 @@ func (s *reposScreen) orgDetail(w int) string {
 	}
 	b.WriteString(rule(w, "") + "\n")
 	if rs, ok := s.orgRepos[o.Login]; ok {
-		b.WriteString(fmt.Sprintf("%d dépôts\n", len(rs)))
+		b.WriteString(i18n.T("%d repositories", len(rs)) + "\n")
 	}
-	b.WriteString("\n" + keyCapStyle.Render(s.open.Help().Key) + dimStyle.Render(" voir les dépôts"))
+	b.WriteString("\n" + keyCapStyle.Render(s.open.Help().Key) + dimStyle.Render(" "+i18n.T("view the repositories")))
 	return b.String()
 }
 

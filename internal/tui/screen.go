@@ -5,6 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/kevin/gitui/internal/browser"
+	"github.com/kevin/gitui/internal/i18n"
 )
 
 // screen is one view in the navigation stack.
@@ -57,6 +58,6 @@ func openInBrowser(url string) tea.Cmd {
 		if err := openURL(url); err != nil {
 			return errMsg{err}
 		}
-		return infoMsg{"ouvert dans le navigateur"}
+		return infoMsg{i18n.T("opened in the browser")}
 	}
 }

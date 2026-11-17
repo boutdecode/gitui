@@ -18,6 +18,7 @@ import (
 	"github.com/alecthomas/chroma/v2/styles"
 
 	"github.com/kevin/gitui/internal/domain"
+	"github.com/kevin/gitui/internal/i18n"
 )
 
 type (
@@ -294,7 +295,7 @@ func (s *codeScreen) cycleBranch() tea.Cmd {
 		}
 	}
 	s.c.branch = next
-	return tea.Batch(s.reset(), info("branche : "+next))
+	return tea.Batch(s.reset(), info(i18n.T("branch: %s", next)))
 }
 
 // reset forgets everything loaded and reloads the root.
@@ -368,7 +369,7 @@ func (s *codeScreen) renderFile() {
 func (s *codeScreen) View() string {
 	lw, rw := s.widths()
 	ph := max(s.h, 3)
-	tree := pinkStyle.Bold(true).Render("Fichiers") + "\n" +
+	tree := pinkStyle.Bold(true).Render(i18n.T("Files")) + "\n" +
 		dimStyle.Render(fit(s.c.repo.Name+s.dirSuffix(), lw-4)) + "\n" + s.treeView(lw-4)
 	if rw == 0 {
 		if s.file != nil || s.loadingF {
@@ -391,9 +392,9 @@ func (s *codeScreen) dirSuffix() string {
 func (s *codeScreen) treeView(w int) string {
 	if len(s.rows) == 0 {
 		if s.loading[""] {
-			return s.spinner.View() + " chargement…"
+			return s.spinner.View() + " " + i18n.T("loading…")
 		}
-		return dimStyle.Render("Dépôt vide.")
+		return dimStyle.Render(i18n.T("Empty repository."))
 	}
 	hh := max(s.h-2-2, 1)
 	end := min(s.top+hh, len(s.rows))
@@ -429,37 +430,37 @@ func (s *codeScreen) row(n node, sel bool, w int) string {
 func humanBytes(n int) string {
 	switch {
 	case n < 1000:
-		return fmt.Sprintf("%d o", n)
+		return fmt.Sprintf("%d B", n)
 	case n < 1_000_000:
-		return fmt.Sprintf("%.1f ko", float64(n)/1000)
+		return fmt.Sprintf("%.1f KB", float64(n)/1000)
 	}
-	return fmt.Sprintf("%.1f Mo", float64(n)/1e6)
+	return fmt.Sprintf("%.1f MB", float64(n)/1e6)
 }
 
 func (s *codeScreen) fileView(w int) string {
 	if s.loadingF {
-		return s.spinner.View() + " chargement du fichier…"
+		return s.spinner.View() + " " + i18n.T("loading the file…")
 	}
 	if s.file == nil {
-		return dimStyle.Render("Sélectionnez un fichier (entrée) pour l'afficher.")
+		return dimStyle.Render(i18n.T("Select a file (%s) to display it.", keyOpenItem.Help().Key))
 	}
 	f := s.file
 	name := pinkStyle.Bold(true).Render(f.Path[strings.LastIndex(f.Path, "/")+1:])
 	meta := fmt.Sprintf("%s · %s", languageOf(f.Path), humanBytes(f.Size))
 	if !f.Binary && !f.TooLarge {
-		meta = fmt.Sprintf("%s · %d lignes · %s", languageOf(f.Path), strings.Count(strings.TrimRight(f.Content, "\n"), "\n")+1, humanBytes(f.Size))
+		meta = fmt.Sprintf("%s · %s · %s", languageOf(f.Path), i18n.T("%d lines", strings.Count(strings.TrimRight(f.Content, "\n"), "\n")+1), humanBytes(f.Size))
 	}
 	head := name + "  " + dimStyle.Render(meta)
 	if f.CommitSHA != "" {
 		sha := f.CommitSHA[:min(len(f.CommitSHA), 7)]
-		head += "  " + dimStyle.Render("dernier commit ") + yellowStyle.Render(sha) + dimStyle.Render(" "+ilYa(f.CommitTime))
+		head += "  " + dimStyle.Render(i18n.T("last commit")+" ") + yellowStyle.Render(sha) + dimStyle.Render(" "+ilYa(f.CommitTime))
 	}
 	var body string
 	switch {
 	case f.Binary:
-		body = dimStyle.Render("Fichier binaire : aperçu indisponible.")
+		body = dimStyle.Render(i18n.T("Binary file: preview unavailable."))
 	case f.TooLarge:
-		body = dimStyle.Render("Fichier trop volumineux pour l'aperçu (o pour l'ouvrir dans le navigateur).")
+		body = dimStyle.Render(i18n.T("File too large to preview (%s to open it in the browser).", keyBrowser.Help().Key))
 	default:
 		body = s.vp.View() + "\n" + dimStyle.Render(fitRight(fmt.Sprintf("%.0f%%", s.vp.ScrollPercent()*100), w))
 	}
@@ -472,13 +473,13 @@ func languageOf(path string) string {
 	if l := lexers.Match(path); l != nil {
 		return l.Config().Name
 	}
-	return "texte"
+	return i18n.T("text")
 }
 
 func (s *codeScreen) Capturing() bool { return false }
 func (s *codeScreen) Keys() []key.Binding {
 	return []key.Binding{
-		key.NewBinding(key.WithKeys("j"), key.WithHelp("j/k", "naviguer")),
+		key.NewBinding(key.WithKeys("j"), key.WithHelp("j/k", i18n.T("navigate"))),
 		s.open, s.parent, s.branch, keyBrowser, keySwitch, keyRefresh,
 	}
 }

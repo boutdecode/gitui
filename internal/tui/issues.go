@@ -13,15 +13,16 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/kevin/gitui/internal/domain"
+	"github.com/kevin/gitui/internal/i18n"
 )
 
 var issueStates = []struct {
 	label string
 	state domain.State
 }{
-	{"ouvertes", domain.StateOpen},
-	{"fermées", domain.StateClosed},
-	{"toutes", ""},
+	{"state|open", domain.StateOpen},
+	{"state|closed", domain.StateClosed},
+	{"state|any", ""},
 }
 
 type issueItem struct{ i domain.Issue }
@@ -207,16 +208,16 @@ func (s *issuesScreen) widths() (int, int) {
 }
 
 func (s *issuesScreen) View() string {
-	bar := toolbar(s.w, s.list, "Filtrer les issues…", pill("état", issueStates[s.stateIdx].label))
+	bar := toolbar(s.w, s.list, i18n.T("Filter issues…"), pill(i18n.T("state"), i18n.T(issueStates[s.stateIdx].label)))
 	lw, rw := s.widths()
 	ph := max(s.h-toolbarHeight, 3)
 
 	var left string
 	switch {
 	case s.loading:
-		left = s.spinner.View() + " chargement des issues…"
+		left = s.spinner.View() + " " + i18n.T("loading issues…")
 	case len(s.list.Items()) == 0:
-		left = dimStyle.Render("Aucune issue.")
+		left = dimStyle.Render(i18n.T("No issue."))
 	default:
 		left = s.list.View()
 	}
@@ -234,9 +235,9 @@ func (s *issuesScreen) preview(w int) string {
 	}
 	var b strings.Builder
 	b.WriteString(pinkStyle.Bold(true).Render(fmt.Sprintf("#%d", is.Number)) + " " + titleStyle.Render(is.Title) + "\n")
-	badge := openBadge.Render("◉ Ouverte")
+	badge := openBadge.Render("◉ " + i18n.T("Open"))
 	if is.State == domain.StateClosed {
-		badge = closedBadge.Render("◉ Fermée")
+		badge = closedBadge.Render("◉ " + i18n.T("Closed"))
 	}
 	b.WriteString(badge + dimStyle.Render("  @"+is.Author) + "\n")
 	if len(is.Labels) > 0 {
@@ -248,12 +249,12 @@ func (s *issuesScreen) preview(w int) string {
 	}
 	b.WriteString(rule(w, "") + "\n")
 	if strings.TrimSpace(is.Body) == "" {
-		b.WriteString(dimStyle.Render("(aucune description)") + "\n")
+		b.WriteString(dimStyle.Render(i18n.T("(no description)")) + "\n")
 	} else {
 		b.WriteString(styleBody(is.Body, w) + "\n")
 	}
 	if cs, ok := s.comments[is.Number]; ok && len(cs) > 0 {
-		b.WriteString(rule(w, fmt.Sprintf("Commentaires (%d)", len(cs))) + "\n")
+		b.WriteString(rule(w, i18n.T("Comments (%d)", len(cs))) + "\n")
 		for _, c := range cs {
 			b.WriteString(blueStyle.Render("@"+c.Author) + dimStyle.Render(" · "+ilYa(c.CreatedAt)) + "\n")
 			b.WriteString(styleBody(c.Body, w) + "\n")
@@ -265,7 +266,7 @@ func (s *issuesScreen) preview(w int) string {
 func (s *issuesScreen) Capturing() bool { return s.list.FilterState() == list.Filtering }
 func (s *issuesScreen) Keys() []key.Binding {
 	return []key.Binding{
-		key.NewBinding(key.WithKeys("j"), key.WithHelp("j/k", "naviguer")),
+		key.NewBinding(key.WithKeys("j"), key.WithHelp("j/k", i18n.T("navigate"))),
 		keyOpenItem, s.filter, keySearch, keySwitch, keyBrowser, keyRefresh,
 	}
 }

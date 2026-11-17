@@ -12,6 +12,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/kevin/gitui/internal/auth"
+	"github.com/kevin/gitui/internal/i18n"
 	"github.com/kevin/gitui/internal/provider"
 )
 
@@ -91,7 +92,7 @@ func newLoginScreen(a *AuthOptions) *loginScreen {
 	}
 }
 
-func (s *loginScreen) Title() string { return "Connexion" }
+func (s *loginScreen) Title() string { return i18n.T("Login") }
 
 func (s *loginScreen) static() bool { return s.a.StaticToken != "" }
 
@@ -122,12 +123,12 @@ func (s *loginScreen) verifyStatic() tea.Cmd {
 func (s *loginScreen) staticErr(err error) error {
 	src := s.a.StaticSource
 	if src == "" {
-		src = "token"
+		src = i18n.T("token")
 	}
 	if errors.Is(err, provider.ErrUnauthorized) {
-		return fmt.Errorf("token refusé par GitHub (invalide, expiré ou révoqué), source : %s", src)
+		return fmt.Errorf(i18n.T("token rejected by GitHub (invalid, expired or revoked), source: %s"), src)
 	}
-	return fmt.Errorf("impossible de vérifier le token (source : %s) : %w", src, err)
+	return fmt.Errorf(i18n.T("could not verify the token (source: %s): %w"), src, err)
 }
 
 func (s *loginScreen) checkStored() tea.Cmd {
@@ -156,7 +157,7 @@ func (s *loginScreen) poll() tea.Cmd {
 		if err == nil && res.Token != "" {
 			// Persist before announcing success so a crash can't lose the token.
 			if serr := s.a.Store.Set(res.Token); serr != nil {
-				return pollResultMsg{gen, auth.PollResult{}, fmt.Errorf("stockage du token : %w", serr)}
+				return pollResultMsg{gen, auth.PollResult{}, fmt.Errorf(i18n.T("storing the token: %w"), serr)}
 			}
 		}
 		return pollResultMsg{gen, res, err}
@@ -276,37 +277,37 @@ func (s *loginScreen) View() string {
 	switch s.state {
 	case loginChecking:
 		if s.static() {
-			body = s.spinner.View() + " vérification du token…"
+			body = s.spinner.View() + " " + i18n.T("verifying the token…")
 		} else {
-			body = s.spinner.View() + " recherche d'une session existante…"
+			body = s.spinner.View() + " " + i18n.T("looking for an existing session…")
 		}
 	case loginNeedClient:
-		body = "Aucune méthode de connexion configurée.\n\n" +
-			"A. Token d'accès personnel (le plus simple) :\n" +
-			"     - variable d'environnement  GITUI_TOKEN\n"
+		body = i18n.T("No login method configured.") + "\n\n" +
+			i18n.T("A. Personal access token (the simplest):") + "\n" +
+			"     - " + i18n.T("environment variable") + "  GITUI_TOKEN\n"
 		if s.a.ConfigPath != "" {
-			body += fmt.Sprintf("     - ou token: … dans %s (en clair sur disque)\n", s.a.ConfigPath)
+			body += "     - " + i18n.T("or token: … in %s (in clear text on disk)", s.a.ConfigPath) + "\n"
 		}
-		body += "\nB. OAuth App (device flow) :\n" +
-			"     1. Settings → Developer settings → OAuth Apps, cochez « Enable Device Flow »\n" +
-			"     2. renseignez son client ID : variable GITUI_CLIENT_ID\n"
+		body += "\n" + i18n.T("B. OAuth App (device flow):") + "\n" +
+			"     1. " + i18n.T("Settings → Developer settings → OAuth Apps, tick “Enable Device Flow”") + "\n" +
+			"     2. " + i18n.T("set its client ID: variable GITUI_CLIENT_ID") + "\n"
 		if s.a.ConfigPath != "" {
-			body += fmt.Sprintf("        ou client_id: … dans %s\n", s.a.ConfigPath)
+			body += "        " + i18n.T("or client_id: … in %s", s.a.ConfigPath) + "\n"
 		}
-		body += "\nPuis relancez gitui."
+		body += "\n" + i18n.T("Then restart gitui.")
 	case loginStarting:
-		body = s.spinner.View() + " demande d'un code à GitHub…"
+		body = s.spinner.View() + " " + i18n.T("requesting a code from GitHub…")
 	case loginWaiting:
-		body = fmt.Sprintf("Ouvrez %s\net saisissez le code :\n\n%s\n\n%s",
+		body = fmt.Sprintf(i18n.T("Open %s\nand enter the code:")+"\n\n%s\n\n%s",
 			urlStyle.Render(s.dc.VerificationURI),
 			codeStyle.Render(s.dc.UserCode),
-			hintStyle.Render("En attente de votre autorisation…"))
+			hintStyle.Render(i18n.T("Waiting for your authorization…")))
 	case loginFailed:
-		hint := "Appuyez sur r pour réessayer."
+		hint := i18n.T("Press %s to retry.", s.retryKey.Help().Key)
 		if s.static() {
-			hint = "Corrigez le token puis relancez gitui, ou appuyez sur r pour revérifier."
+			hint = i18n.T("Fix the token then restart gitui, or press %s to check again.", s.retryKey.Help().Key)
 		}
-		body = errorStyle.Render("Connexion impossible : "+errText(s.err)) + "\n\n" +
+		body = errorStyle.Render(i18n.T("Login failed: ")+errText(s.err)) + "\n\n" +
 			hintStyle.Render(hint)
 	}
 	return lipgloss.NewStyle().Padding(1, 2).Render(body)
@@ -314,7 +315,7 @@ func (s *loginScreen) View() string {
 
 func errText(err error) string {
 	if errors.Is(err, auth.ErrExpired) {
-		return "le code a expiré"
+		return i18n.T("the code has expired")
 	}
 	return err.Error()
 }

@@ -238,7 +238,7 @@ func TestErrorMapping(t *testing.T) {
 	if _, err := p.ListRepos(context.Background()); !errors.Is(err, provider.ErrUnauthorized) {
 		t.Fatalf("401 should map to ErrUnauthorized, got %v", err)
 	}
-	if _, err := p.ListIssues(context.Background(), repo, ""); err == nil || !strings.Contains(err.Error(), "limite") {
-		t.Fatalf("rate limit error not translated: %v", err)
+	if _, err := p.ListIssues(context.Background(), repo, ""); err == nil || !strings.Contains(err.Error(), "rate limit") {
+		t.Fatalf("unexpected rate limit error: %v", err)
 	}
 }
