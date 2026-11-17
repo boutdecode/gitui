@@ -64,10 +64,10 @@ func (i repoItem) Row(w int, sel bool) string {
 	r := i.r
 	name := r.FullName()
 	if r.Private {
-		name += " ⚿"
+		name += " [privé]"
 	}
 	if r.Fork {
-		name += " ⑂"
+		name += " [fork]"
 	}
 	if r.Archived {
 		name += " [archivé]"
