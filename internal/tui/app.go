@@ -243,7 +243,7 @@ func (m Model) helpView() string {
 func (m Model) chromeHeight() int {
 	n := 1 + 1 + 1 + lipgloss.Height(m.helpView()) // header, status, rule, help
 	if _, ok := m.top().(tabbed); ok {
-		n++
+		n += 2 // spacer under the header, tab bar
 	}
 	return n
 }
@@ -305,7 +305,7 @@ func (m Model) View() tea.View {
 	parts := []string{headerView(m.innerW(), m.headerContext(), m.user)}
 	if tb, ok := m.top().(tabbed); ok {
 		tabs, active := tb.Tabs()
-		parts = append(parts, tabsView(tabs, active))
+		parts = append(parts, "", tabsView(tabs, active))
 	}
 
 	status := statusStyle.Render(m.quotaText())
