@@ -19,6 +19,9 @@ import (
 	"github.com/kevin/gitui/internal/tui"
 )
 
+// version is set at release time via -ldflags "-X main.version=...".
+var version = "dev"
+
 func main() {
 	// The language must be known before the flags are declared (their help is
 	// translated), so --lang is looked up by hand first.
@@ -33,9 +36,14 @@ func main() {
 	useFake := flag.Bool("fake", false, i18n.T("use the fake provider (no login)"))
 	doLogout := flag.Bool("logout", false, i18n.T("delete the stored credentials (keyring and file) and quit"))
 	transparent := flag.Bool("transparent", false, i18n.T("keep the terminal background (do not paint the theme background)"))
+	showVersion := flag.Bool("version", false, i18n.T("print the version and quit"))
 	flag.String("lang", "auto", i18n.T("interface language: auto (from the system), en or fr"))
 	flag.Parse()
 
+	if *showVersion {
+		fmt.Println("gitui", version)
+		return
+	}
 	if *doLogout {
 		// Before anything else: no config file is created, nothing is parsed.
 		if err := logout(os.Stdout, tokenStore(), config.Path()); err != nil {

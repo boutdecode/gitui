@@ -15,7 +15,18 @@ A terminal Git client built with the [Charm](https://charm.land) stack
 
 ## Installation
 
-Requires Go ≥ 1.26.
+Quick install (Linux and macOS, amd64/arm64) from the latest release:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/boutdecode/gitui/main/install.sh | bash
+```
+
+The script verifies the SHA-256 checksum and installs `gitui` into
+`/usr/local/bin` (or `~/.local/bin` without write access/sudo). Options:
+`GITUI_VERSION=v0.1.0` pins a version, `GITUI_INSTALL_DIR=/some/dir` sets the
+target directory.
+
+From source, requires Go ≥ 1.26:
 
 ```sh
 go install github.com/kevin/gitui/cmd/gitui@latest   # adjust the module path
@@ -196,4 +207,15 @@ its code in `i18n.Langs` / `i18n.Parse`.
 make test      # go test ./...
 make vet       # go vet ./...
 make run-fake  # interface with fake data
+```
+
+### Releasing
+
+CI (`.github/workflows/ci.yml`) runs `go vet` and `go test` on every push to
+`main` and every pull request. Pushing a `v*` tag runs
+`.github/workflows/release.yml`: tests, then [GoReleaser](https://goreleaser.com)
+publishes the archives and `checksums.txt` as a GitHub release.
+
+```sh
+git tag v0.1.0 && git push origin v0.1.0
 ```

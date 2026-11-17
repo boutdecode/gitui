@@ -1,4 +1,4 @@
-.PHONY: run run-fake test vet build
+.PHONY: run run-fake test vet build release-check
 run:
 	go run ./cmd/gitui
 run-fake:
@@ -9,3 +9,5 @@ vet:
 	go vet ./...
 build:
 	go build -o gitui ./cmd/gitui
+release-check:
+	goreleaser check

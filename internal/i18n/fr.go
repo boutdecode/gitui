@@ -216,6 +216,7 @@ var fr = map[string]string{
 	// Command line.
 	"use the fake provider (no login)":                                       "utiliser le provider factice (sans connexion)",
 	"delete the stored credentials (keyring and file) and quit":              "supprimer les identifiants stockés (trousseau et fichier) et quitter",
+	"print the version and quit":                                             "afficher la version et quitter",
 	"keep the terminal background (do not paint the theme background)":       "garder le fond du terminal (ne pas peindre le fond du thème)",
 	"interface language: auto (from the system), en or fr":                   "langue de l'interface : auto (selon le système), en ou fr",
 	"could not create %s: %v":                                                "impossible de créer %s : %v",
