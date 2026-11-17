@@ -210,8 +210,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // switchTab handles 1-9 and the switch key on a tabbed screen.
 func (m *Model) switchTab(tb tabbed, msg tea.KeyPressMsg) (tea.Cmd, bool) {
 	tabs, active := tb.Tabs()
-	if key.Matches(msg, keySwitch) {
+	switch {
+	case key.Matches(msg, keySwitch):
 		return tb.SwitchTab((active + 1) % len(tabs)), true
+	case key.Matches(msg, keySwitchBack):
+		return tb.SwitchTab((active + len(tabs) - 1) % len(tabs)), true
 	}
 	if k := msg.String(); len(k) == 1 && k[0] >= '1' && k[0] <= '9' {
 		if i := int(k[0] - '1'); i < len(tabs) {

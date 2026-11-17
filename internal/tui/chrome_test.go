@@ -1,10 +1,12 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
 	"github.com/kevin/gitui/internal/provider/fake"
@@ -153,5 +155,28 @@ func TestMarginKeepsAppAwayFromEdges(t *testing.T) {
 	m.width, m.height = 50, 12
 	if m.hasMargin() {
 		t.Fatal("no margin on a tiny terminal")
+	}
+}
+
+func TestTabAndShiftTabCycleTabs(t *testing.T) {
+	m := New(Options{Provider: fake.New()})
+	m = run(t, m, tea.WindowSizeMsg{Width: 100, Height: 30})
+	m = run(t, m, reposLoadedMsg{tab: repoTabMine, repos: mustRepos(t)})
+	m = run(t, m, tea.KeyPressMsg{Code: tea.KeyEnter}) // Code tab
+	steps := []struct {
+		k    tea.KeyPressMsg
+		want any
+	}{
+		{tea.KeyPressMsg{Code: tea.KeyTab}, &prsScreen{}},
+		{tea.KeyPressMsg{Code: tea.KeyTab}, &issuesScreen{}},
+		{tea.KeyPressMsg{Code: tea.KeyTab}, &codeScreen{}},
+		{tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}, &issuesScreen{}},
+		{tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}, &prsScreen{}},
+	}
+	for i, st := range steps {
+		m = run(t, m, st.k)
+		if fmt.Sprintf("%T", m.top()) != fmt.Sprintf("%T", st.want) {
+			t.Fatalf("step %d: on %T, want %T", i, m.top(), st.want)
+		}
 	}
 }

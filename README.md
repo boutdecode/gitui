@@ -122,6 +122,7 @@ configure. Les touches des composants (déplacement dans les listes, défilement
 | `logout`  | `L`               | une fois connecté               |
 | `open`    | `enter`           | listes                          |
 | `switch`  | `tab`             | onglet suivant (`1`-`4` : accès direct) |
+| `switchback` | `shift+tab`    | onglet précédent                |
 | `browser` | `o`               | listes et détail                |
 | `search`  | `/`               | listes                          |
 | `filter`  | `f`               | dépôts (visibilité), PR et issues (état) |
