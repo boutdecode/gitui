@@ -11,6 +11,8 @@ A terminal Git client built with the [Charm](https://charm.land) stack
 - Automatic light/dark theme, configurable shortcuts
 - English and French interface
 
+![gitui screenshot](docs/sreenshot.png)
+
 ## Installation
 
 Requires Go ≥ 1.26.
